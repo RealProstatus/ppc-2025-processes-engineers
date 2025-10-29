@@ -11,14 +11,23 @@ namespace melnik_i_min_neigh_diff_vec {
 MelnikIMinNeighDiffVecSEQ::MelnikIMinNeighDiffVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
-  GetOutput() = std::make_tuple(-1,-1);
+  GetOutput() = std::make_tuple(-1, -1);
 }
 
 bool MelnikIMinNeighDiffVecSEQ::ValidationImpl() {
-  return GetInput().size() > 1;
+  return !GetInput().empty() && GetInput().size() > 1;
 }
 
 bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
+  // move this into ValidationImpl
+  for (int i = 0; i < GetInput().size(); i++)
+  {
+    if (!std::isfinite(GetInput()[i]))
+    {
+      return false;
+    }
+  }
+  
   return true;
 }
 
