@@ -15,19 +15,23 @@ MelnikIMinNeighDiffVecSEQ::MelnikIMinNeighDiffVecSEQ(const InType &in) {
 }
 
 bool MelnikIMinNeighDiffVecSEQ::ValidationImpl() {
-  return !GetInput().empty() && GetInput().size() > 1;
-}
-
-bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
-  // move this into ValidationImpl
-  for (int i = 0; i < GetInput().size(); i++)
+  if (GetInput().size() < 2)
   {
-    if (!std::isfinite(GetInput()[i]))
+    return false;
+  }
+
+  for (auto it = GetInput().begin(); it != GetInput().end(); ++it)
+  {
+    if (!std::isfinite(*it))
     {
       return false;
     }
   }
-  
+
+  return true;
+}
+
+bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
   return true;
 }
 
