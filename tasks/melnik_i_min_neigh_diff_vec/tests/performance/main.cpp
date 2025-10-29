@@ -29,7 +29,7 @@ TEST_P(MelnikIRunPerfTestProcesses, RunPerfModes) {
 }
 
 const auto kAllPerfTasks =
-    ppc::util::MakeAllPerfTasks<InType, NesterovATestTaskMPI, NesterovATestTaskSEQ>(PPC_SETTINGS_melnik_i_min_neigh_diff_vec);
+    ppc::util::MakeAllPerfTasks<InType, MelnikIMinNeighDiffVecMPI, MelnikIMinNeighDiffVecSEQ>(PPC_SETTINGS_melnik_i_min_neigh_diff_vec);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 
