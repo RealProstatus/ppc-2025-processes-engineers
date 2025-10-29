@@ -11,50 +11,40 @@ namespace melnik_i_min_neigh_diff_vec {
 MelnikIMinNeighDiffVecSEQ::MelnikIMinNeighDiffVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
-  GetOutput() = 0;
+  GetOutput() = std::make_tuple(-1,-1);
 }
 
 bool MelnikIMinNeighDiffVecSEQ::ValidationImpl() {
-  return (GetInput() > 0) && (GetOutput() == 0);
+  return GetInput().size() > 1;
 }
 
 bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
-  GetOutput() = 2 * GetInput();
-  return GetOutput() > 0;
+  return true;
 }
 
 bool MelnikIMinNeighDiffVecSEQ::RunImpl() {
-  if (GetInput() == 0) {
-    return false;
-  }
+  const std::vector<double>& inputPtr = GetInput();
 
-  for (InType i = 0; i < GetInput(); i++) {
-    for (InType j = 0; j < GetInput(); j++) {
-      for (InType k = 0; k < GetInput(); k++) {
-        std::vector<InType> tmp(i + j + k, 1);
-        GetOutput() += std::accumulate(tmp.begin(), tmp.end(), 0);
-        GetOutput() -= i + j + k;
-      }
+  int minIdx = 0;
+  double minDiff = std::abs(inputPtr[1] - inputPtr[0]);
+  double currDiff;
+  
+  for (int i = 1; i < inputPtr.size() - 1; i++)
+  {
+    currDiff = std::abs(inputPtr[i] - inputPtr[i+1]);
+    if (currDiff < minDiff)
+    {
+      minDiff = currDiff;
+      minIdx = i;
     }
   }
 
-  const int num_threads = ppc::util::GetNumThreads();
-  GetOutput() *= num_threads;
-
-  int counter = 0;
-  for (int i = 0; i < num_threads; i++) {
-    counter++;
-  }
-
-  if (counter != 0) {
-    GetOutput() /= counter;
-  }
-  return GetOutput() > 0;
+  GetOutput() = std::make_tuple(minIdx, minIdx + 1);
+  return true;
 }
 
 bool MelnikIMinNeighDiffVecSEQ::PostProcessingImpl() {
-  GetOutput() -= GetInput();
-  return GetOutput() > 0;
+  return true;
 }
 
 }  // namespace melnik_i_min_neigh_diff_vec
