@@ -15,20 +15,7 @@ MelnikIMinNeighDiffVecSEQ::MelnikIMinNeighDiffVecSEQ(const InType &in) {
 }
 
 bool MelnikIMinNeighDiffVecSEQ::ValidationImpl() {
-  if (GetInput().size() < 2)
-  {
-    return false;
-  }
-
-  for (auto it = GetInput().begin(); it != GetInput().end(); ++it)
-  {
-    if (!std::isfinite(*it))
-    {
-      return false;
-    }
-  }
-
-  return true;
+  return GetInput().size() >= 2;
 }
 
 bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
@@ -36,23 +23,24 @@ bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
 }
 
 bool MelnikIMinNeighDiffVecSEQ::RunImpl() {
-  const std::vector<double>& inputPtr = GetInput();
-
-  int minIdx = 0;
-  double minDiff = std::abs(inputPtr[1] - inputPtr[0]);
-  double currDiff;
-  
-  for (int i = 1; i < inputPtr.size() - 1; i++)
-  {
-    currDiff = std::abs(inputPtr[i] - inputPtr[i+1]);
-    if (currDiff < minDiff)
-    {
-      minDiff = currDiff;
-      minIdx = i;
-    }
+  const auto& input = GetInput();
+  if (input.size() < 2) {
+    return false;
   }
 
-  GetOutput() = std::make_tuple(minIdx, minIdx + 1);
+  auto iota_range = std::views::iota(size_t{0}, input.size() - 1);
+  auto comparator = [&](size_t i, size_t j) {
+    int diff_i = std::abs(input[i] - input[i + 1]);
+    int diff_j = std::abs(input[j] - input[j + 1]);
+    if (diff_i == diff_j) {
+      return i < j;
+    }
+    return diff_i < diff_j;
+  };
+  auto min_it = std::min_element(iota_range.begin(), iota_range.end(), comparator);
+  int min_idx = static_cast<int>(*min_it);
+
+  GetOutput() = std::make_tuple(min_idx, min_idx + 1);
   return true;
 }
 
