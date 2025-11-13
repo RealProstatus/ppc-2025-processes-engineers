@@ -123,7 +123,7 @@ const std::array<TestType, 15> kTestParam = {
     // 14. Очень большие положительные/отрицательные
     std::make_tuple(std::vector<int>{1000000, 1000001, -1000000, -999999}, "extreme_values"),
     // 15. Векторы с равными разницами
-    std::make_tuple(std::vector<int>{1, 2, 3, 4, 5}, "equal_diffs_should_pick_first");
+    std::make_tuple(std::vector<int>{1, 2, 3, 4, 5}, "equal_diffs_should_pick_first")};
 // 16. Пустой вектор
 // std::make_tuple(std::vector<int>{}, "empty_vector"),
 // 17. Один элемент

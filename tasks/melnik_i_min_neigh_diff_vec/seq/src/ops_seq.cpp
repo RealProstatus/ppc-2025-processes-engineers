@@ -37,7 +37,7 @@ bool MelnikIMinNeighDiffVecSEQ::RunImpl() {
     }
     return diff_i < diff_j;
   };
-  auto min_it = std::min_element(iota_range.begin(), iota_range.end(), comparator);
+  auto min_it = std::ranges::min_element(iota_range, comparator);
   int min_idx = static_cast<int>(*min_it);
 
   GetOutput() = std::make_tuple(min_idx, min_idx + 1);
