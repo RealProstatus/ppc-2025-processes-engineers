@@ -3,14 +3,13 @@
 #include <mpi.h>
 
 #include <algorithm>
-#include <cmath>
+#include <array>
 #include <cstdlib>
 #include <limits>
 #include <tuple>
 #include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
-#include "util/include/util.hpp"
 
 namespace melnik_i_min_neigh_diff_vec {
 
@@ -21,7 +20,7 @@ MelnikIMinNeighDiffVecMPI::MelnikIMinNeighDiffVecMPI(const InType &in) {
 }
 
 bool MelnikIMinNeighDiffVecMPI::ValidationImpl() {
-  int rank;
+  int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   int is_valid = 1;
@@ -41,8 +40,10 @@ bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
 }
 
 bool MelnikIMinNeighDiffVecMPI::RunImpl() {
-  int rank, comm_size;
+  int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+  int comm_size = 1;
   MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
   const auto &global_input = GetInput();
@@ -100,8 +101,10 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
     for (int i = 0; i < local_size - 1; ++i) {
       int curr_diff = std::abs(local_data[i + 1] - local_data[i]);
       // Update if smaller diff, or equal diff but smaller index (for stability)
-      if (curr_diff < local_res.diff || (curr_diff == local_res.diff && (local_displ + i) < local_res.index)) {
+      if (curr_diff < local_res.diff) {
         local_res.diff = curr_diff;
+        local_res.index = local_displ + i;
+      } else if (curr_diff == local_res.diff && (local_displ + i) < local_res.index) {
         local_res.index = local_displ + i;
       }
     }
@@ -117,7 +120,7 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
     int recv_from_right = 0;
 
     // Prepare non-blocking requests for efficiency
-    MPI_Request requests[4];
+    std::array<MPI_Request, 4> requests;
     int req_count = 0;
 
     // Exchange with left neighbor
@@ -138,15 +141,17 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
 
     // Wait for all exchanges to complete
     if (req_count > 0) {
-      MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
+      MPI_Waitall(req_count, requests.data(), MPI_STATUSES_IGNORE);
     }
 
     // Check left boundary diff
     if (rank > 0 && local_size > 0) {
       int boundary_diff = std::abs(left_boundary - recv_from_left);
       int boundary_idx = local_displ - 1;
-      if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+      if (boundary_diff < local_res.diff) {
         local_res.diff = boundary_diff;
+        local_res.index = boundary_idx;
+      } else if (boundary_diff == local_res.diff && boundary_idx < local_res.index) {
         local_res.index = boundary_idx;
       }
     }
@@ -155,8 +160,10 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
     if (rank < comm_size - 1 && local_size > 0) {
       int boundary_diff = std::abs(recv_from_right - right_boundary);
       int boundary_idx = local_displ + local_size - 1;
-      if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+      if (boundary_diff < local_res.diff) {
         local_res.diff = boundary_diff;
+        local_res.index = boundary_idx;
+      } else if (boundary_diff == local_res.diff && boundary_idx < local_res.index) {
         local_res.index = boundary_idx;
       }
     }
