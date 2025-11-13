@@ -24,17 +24,16 @@ bool MelnikIMinNeighDiffVecMPI::ValidationImpl() {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  bool is_valid = true;
+  int is_valid = 1;
   if (rank == 0) {
     const auto &input = GetInput();
     if (input.size() < 2) {
-      is_valid = false;
+      is_valid = 0;
     }
   }
 
-  // may be deleted in future
-  MPI_Bcast(&is_valid, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
-  return is_valid;
+  MPI_Bcast(&is_valid, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  return is_valid != 0;
 }
 
 bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
@@ -54,7 +53,6 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
   }
   MPI_Bcast(&global_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-  // may be deleted in future
   if (global_size < 2) {
     return false;
   }
