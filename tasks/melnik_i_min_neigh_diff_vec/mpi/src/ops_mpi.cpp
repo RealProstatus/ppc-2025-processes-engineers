@@ -1,36 +1,18 @@
 #include "melnik_i_min_neigh_diff_vec/mpi/include/ops_mpi.hpp"
 
 #include <mpi.h>
+
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <limits>
 #include <tuple>
 #include <vector>
-#include <algorithm>
-#include <limits>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
 #include "util/include/util.hpp"
 
 namespace melnik_i_min_neigh_diff_vec {
-
-struct LocalResult {
-    double min_diff;
-    int min_index;
-    double boundary_left;
-    double boundary_right;
-};
-
-void minDiffReduce(void* invec, void* inoutvec, int* len, MPI_Datatype* datatype) {
-    (void)datatype; // Явно указываем, что параметр не используется
-    LocalResult* in = static_cast<LocalResult*>(invec);
-    LocalResult* inout = static_cast<LocalResult*>(inoutvec);
-    
-    for (int i = 0; i < *len; i++) {
-        if (in[i].min_diff < inout[i].min_diff) {
-            inout[i].min_diff = in[i].min_diff;
-            inout[i].min_index = in[i].min_index;
-        }
-    }
-}
 
 MelnikIMinNeighDiffVecMPI::MelnikIMinNeighDiffVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
@@ -41,12 +23,18 @@ MelnikIMinNeighDiffVecMPI::MelnikIMinNeighDiffVecMPI(const InType &in) {
 bool MelnikIMinNeighDiffVecMPI::ValidationImpl() {
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
+
+  bool is_valid = true;
   if (rank == 0) {
-    return GetInput().size() >= 2;
+    const auto &input = GetInput();
+    if (input.size() < 2) {
+      is_valid = false;
+    }
   }
 
-  return true;
+  // may be deleted in future
+  MPI_Bcast(&is_valid, 1, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+  return is_valid;
 }
 
 bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
@@ -54,133 +42,141 @@ bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
 }
 
 bool MelnikIMinNeighDiffVecMPI::RunImpl() {
-  int rank, size;
+  int rank, comm_size;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
-    
-  const std::vector<double>& global_vec = GetInput();
-  std::vector<double> local_data;
-  int local_size = 0;
-  int displacement = 0;
-  
-  std::vector<int> counts(size);
-  std::vector<int> displs(size);
-    
-  // 1. Распределение данных
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+
+  const auto &global_input = GetInput();
+  int global_size = 0;
+
   if (rank == 0) {
-      int n = global_vec.size();
-        
-      // Вычисляем размеры блоков для каждого процесса
-      int base_size = n / size;
-      int remainder = n % size;
-        
-      for (int i = 0; i < size; i++) {
-          counts[i] = base_size + (i < remainder ? 1 : 0);
-          displs[i] = (i == 0) ? 0 : displs[i - 1] + counts[i - 1];
-      }
-        
-      // Рассылаем размеры блоков и данные
-      for (int i = 1; i < size; i++) {
-          MPI_Send(&counts[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-          MPI_Send(&displs[i], 1, MPI_INT, i, 1, MPI_COMM_WORLD);
-          MPI_Send(global_vec.data() + displs[i], counts[i], MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
-      }
-        
-      local_size = counts[0];
-      displacement = displs[0];
-      local_data.assign(global_vec.begin(), global_vec.begin() + local_size);
-        
-  } else {
-      // Получаем размер и смещение от root-процесса
-      MPI_Recv(&local_size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      MPI_Recv(&displacement, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        
-      local_data.resize(local_size);
-      // Получаем данные
-      MPI_Recv(local_data.data(), local_size, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    global_size = static_cast<int>(global_input.size());
   }
-    
-  // 2. Локальный поиск минимума в сегменте
-  LocalResult local_result;
-  local_result.min_diff = std::numeric_limits<double>::max();
-  local_result.min_index = -1;
-    
-  if (local_size > 0) {
-      local_result.boundary_left = local_data[0];
-      local_result.boundary_right = local_data[local_size - 1];
-        
-      // Поиск минимальной разницы в локальном сегменте
-      for (int i = 0; i < local_size - 1; i++) {
-          double diff = std::abs(local_data[i + 1] - local_data[i]);
-          if (diff < local_result.min_diff) {
-              local_result.min_diff = diff;
-              local_result.min_index = displacement + i; // Глобальный индекс
-          }
-      }
-  } else {
-      local_result.boundary_left = 0;
-      local_result.boundary_right = 0;
+  MPI_Bcast(&global_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  // may be deleted in future
+  if (global_size < 2) {
+    return false;
   }
-    
-  // 3. Учет граничных пар между процессами
-  if (size > 1) {
-      // Обмен граничными значениями
-      double send_left = local_result.boundary_left;
-      double send_right = local_result.boundary_right;
-      double recv_left, recv_right;
-        
-      // Обмен с левым соседом
-      if (rank > 0) {
-          MPI_Send(&send_left, 1, MPI_DOUBLE, rank - 1, 3, MPI_COMM_WORLD);
-          MPI_Recv(&recv_right, 1, MPI_DOUBLE, rank - 1, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            
-          double boundary_diff = std::abs(local_result.boundary_left - recv_right);
-          if (boundary_diff < local_result.min_diff) {
-              local_result.min_diff = boundary_diff;
-              local_result.min_index = displacement - 1; // Индекс последнего элемента левого соседа
-          }
-      }
-        
-      // Обмен с правым соседом
-      if (rank < size - 1) {
-          MPI_Recv(&recv_left, 1, MPI_DOUBLE, rank + 1, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-          MPI_Send(&send_right, 1, MPI_DOUBLE, rank + 1, 4, MPI_COMM_WORLD);
-            
-          double boundary_diff = std::abs(local_result.boundary_right - recv_left);
-          if (boundary_diff < local_result.min_diff) {
-              local_result.min_diff = boundary_diff;
-              local_result.min_index = displacement + local_size - 1; // Индекс последнего элемента текущего процесса
-          }
-      }
+
+  // Prepare for data distribution: counts and displacements
+  std::vector<int> counts(comm_size);
+  std::vector<int> displs(comm_size);
+  int local_size = 0;
+
+  if (rank == 0) {
+    // Balanced distribution: base size + remainder for first processes
+    int base = global_size / comm_size;
+    int rem = global_size % comm_size;
+    int offset = 0;
+    for (int i = 0; i < comm_size; ++i) {
+      counts[i] = base + (i < rem ? 1 : 0);
+      displs[i] = offset;
+      offset += counts[i];
+    }
   }
-    
-  // 4. Глобальная редукция для нахождения общего минимума
-  LocalResult global_result;
-  global_result.min_diff = std::numeric_limits<double>::max();
-  global_result.min_index = -1;
-    
-  // Используем пользовательскую операцию редукции
-  MPI_Datatype local_result_type;
-  MPI_Type_contiguous(4, MPI_DOUBLE, &local_result_type);
-  MPI_Type_commit(&local_result_type);
-    
-  MPI_Op min_diff_op;
-  MPI_Op_create(minDiffReduce, 1, &min_diff_op);
-    
-  MPI_Allreduce(&local_result, &global_result, 1, local_result_type, min_diff_op, MPI_COMM_WORLD);
-    
-  MPI_Op_free(&min_diff_op);
-  MPI_Type_free(&local_result_type);
-    
-  // 5. Установка результатов
-  if (global_result.min_index >= 0) {
-      GetOutput() = std::make_tuple(global_result.min_index, global_result.min_index + 1);
-  } else {
-      GetOutput() = std::make_tuple(-1, -1);
+
+  // Scatter local sizes to each process
+  MPI_Scatter(counts.data(), 1, MPI_INT, &local_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  // Allocate local data buffer
+  std::vector<int> local_data(local_size);
+
+  // Scatter the actual data chunks
+  MPI_Scatterv(rank == 0 ? global_input.data() : nullptr, counts.data(), displs.data(), MPI_INT, local_data.data(),
+               local_size, MPI_INT, 0, MPI_COMM_WORLD);
+
+  // Compute local displacement
+  int local_displ = 0;
+  MPI_Scan(&local_size, &local_displ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  local_displ -= local_size;
+
+  // Structure to hold min diff and its global index
+  struct Result {
+    int diff = std::numeric_limits<int>::max();
+    int index = -1;
+  } local_res, global_res;
+
+  // Local computation: find min diff in this chunk
+  if (local_size >= 2) {
+    for (int i = 0; i < local_size - 1; ++i) {
+      int curr_diff = std::abs(local_data[i + 1] - local_data[i]);
+      // Update if smaller diff, or equal diff but smaller index (for stability)
+      if (curr_diff < local_res.diff || (curr_diff == local_res.diff && (local_displ + i) < local_res.index)) {
+        local_res.diff = curr_diff;
+        local_res.index = local_displ + i;
+      }
+    }
   }
-    
-  MPI_Barrier(MPI_COMM_WORLD);
-  return global_result.min_index >= 0;
+
+  // Handle boundary pairs between processes if multiple processes
+  if (comm_size > 1) {
+    // Get boundary values (or 0 if empty chunk)
+    int left_boundary = local_size > 0 ? local_data.front() : 0;
+    int right_boundary = local_size > 0 ? local_data.back() : 0;
+
+    int recv_from_left = 0;
+    int recv_from_right = 0;
+
+    // Prepare non-blocking requests for efficiency
+    MPI_Request requests[4];
+    int req_count = 0;
+
+    // Exchange with left neighbor
+    if (rank > 0) {
+      // Send my left to left neighbor (their right)
+      MPI_Isend(&left_boundary, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
+      // Receive left neighbor's right
+      MPI_Irecv(&recv_from_left, 1, MPI_INT, rank - 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
+    }
+
+    // Exchange with right neighbor
+    if (rank < comm_size - 1) {
+      // Receive right neighbor's left
+      MPI_Irecv(&recv_from_right, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD, &requests[req_count++]);
+      // Send my right to right neighbor (their left)
+      MPI_Isend(&right_boundary, 1, MPI_INT, rank + 1, 1, MPI_COMM_WORLD, &requests[req_count++]);
+    }
+
+    // Wait for all exchanges to complete
+    if (req_count > 0) {
+      MPI_Waitall(req_count, requests, MPI_STATUSES_IGNORE);
+    }
+
+    // Check left boundary diff
+    if (rank > 0 && local_size > 0) {
+      int boundary_diff = std::abs(left_boundary - recv_from_left);
+      int boundary_idx = local_displ - 1;
+      if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+        local_res.diff = boundary_diff;
+        local_res.index = boundary_idx;
+      }
+    }
+
+    // Check right boundary diff
+    if (rank < comm_size - 1 && local_size > 0) {
+      int boundary_diff = std::abs(recv_from_right - right_boundary);
+      int boundary_idx = local_displ + local_size - 1;
+      if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+        local_res.diff = boundary_diff;
+        local_res.index = boundary_idx;
+      }
+    }
+  }
+
+  // Global reduction: find overall min using MPI_MINLOC for {diff, index}
+  MPI_Reduce(&local_res, &global_res, 1, MPI_2INT, MPI_MINLOC, 0, MPI_COMM_WORLD);
+
+  // Broadcast the global result to all processes
+  MPI_Bcast(&global_res, 1, MPI_2INT, 0, MPI_COMM_WORLD);
+
+  // Set output if valid
+  if (global_res.index >= 0) {
+    GetOutput() = std::make_tuple(global_res.index, global_res.index + 1);
+    return true;
+  }
+
+  return false;
 }
 
 bool MelnikIMinNeighDiffVecMPI::PostProcessingImpl() {
