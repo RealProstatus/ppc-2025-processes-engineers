@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <vector>
+
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
 #include "melnik_i_min_neigh_diff_vec/mpi/include/ops_mpi.hpp"
 #include "melnik_i_min_neigh_diff_vec/seq/include/ops_seq.hpp"
@@ -7,16 +10,21 @@
 
 namespace melnik_i_min_neigh_diff_vec {
 
-class MelnikIRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
-  const int kCount_ = 100;
-  InType input_data_{};
+class MelnikIMinNeighDiffVecRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
+  InType input_data_;
 
   void SetUp() override {
-    input_data_ = kCount_;
+    const size_t vector_size = 100000000;
+    std::vector<int> vector(vector_size);
+    for (size_t i = 0; i < vector_size; ++i) {
+      vector[i] = static_cast<int>(i % 1000) + (i % 2 == 0 ? 1 : -1);
+    }
+    input_data_ = vector;
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    return input_data_ == output_data;
+    auto [first, second] = output_data;
+    return first >= 0 && second == first + 1 && static_cast<size_t>(second) < input_data_.size();
   }
 
   InType GetTestInputData() final {
@@ -24,17 +32,17 @@ class MelnikIRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, O
   }
 };
 
-TEST_P(MelnikIRunPerfTestProcesses, RunPerfModes) {
+TEST_P(MelnikIMinNeighDiffVecRunPerfTestProcesses, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks =
-    ppc::util::MakeAllPerfTasks<InType, MelnikIMinNeighDiffVecMPI, MelnikIMinNeighDiffVecSEQ>(PPC_SETTINGS_melnik_i_min_neigh_diff_vec);
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, MelnikIMinNeighDiffVecMPI, MelnikIMinNeighDiffVecSEQ>(
+    PPC_SETTINGS_melnik_i_min_neigh_diff_vec);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 
-const auto kPerfTestName = MelnikIRunPerfTestProcesses::CustomPerfTestName;
+const auto kPerfTestName = MelnikIMinNeighDiffVecRunPerfTestProcesses::CustomPerfTestName;
 
-INSTANTIATE_TEST_SUITE_P(RunModeTests, MelnikIRunPerfTestProcesses, kGtestValues, kPerfTestName);
+INSTANTIATE_TEST_SUITE_P(RunModeTests, MelnikIMinNeighDiffVecRunPerfTestProcesses, kGtestValues, kPerfTestName);
 
 }  // namespace melnik_i_min_neigh_diff_vec

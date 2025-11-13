@@ -23,7 +23,7 @@ bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
 }
 
 bool MelnikIMinNeighDiffVecSEQ::RunImpl() {
-  const auto& input = GetInput();
+  const auto &input = GetInput();
   if (input.size() < 2) {
     return false;
   }
