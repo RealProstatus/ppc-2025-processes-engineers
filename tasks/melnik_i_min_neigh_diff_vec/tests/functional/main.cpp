@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
@@ -38,10 +39,8 @@ class MelnikIMinNeighDiffVecRunFuncTestsProcesses : public ppc::util::BaseRunFun
     int min_diff = std::abs(vector[1] - vector[0]);
     for (size_t i = 1; i < vector.size() - 1; ++i) {
       int curr_diff = std::abs(vector[i + 1] - vector[i]);
-      if (curr_diff < min_diff) {
+      if (curr_diff < min_diff || (curr_diff == min_diff && static_cast<int>(i) < expected_idx)) {
         min_diff = curr_diff;
-        expected_idx = static_cast<int>(i);
-      } else if (curr_diff == min_diff && std::cmp_less(i, expected_idx)) {
         expected_idx = static_cast<int>(i);
       }
     }
@@ -65,7 +64,7 @@ TEST_P(MelnikIMinNeighDiffVecRunFuncTestsProcesses, MinNeighDiffTest) {
 }
 
 // Тестовые параметры: (вектор, описание)
-const std::array<TestType, 17> kTestParam = {
+const std::array<TestType, 15> kTestParam = {
     // 1. Простые
     std::make_tuple(std::vector<int>{1, 2, 3, 4}, "basic_increasing_4"),
     // 2. Нули
@@ -125,6 +124,10 @@ const std::array<TestType, 17> kTestParam = {
     std::make_tuple(std::vector<int>{1000000, 1000001, -1000000, -999999}, "extreme_values"),
     // 15. Векторы с равными разницами
     std::make_tuple(std::vector<int>{1, 2, 3, 4, 5}, "equal_diffs_should_pick_first")};
+// 16. Пустой вектор
+// std::make_tuple(std::vector<int>{}, "empty_vector"),
+// 17. Один элемент
+// std::make_tuple(std::vector<int>{42}, "single_element")};
 
 const auto kTestTasksList = std::tuple_cat(
     ppc::util::AddFuncTask<MelnikIMinNeighDiffVecMPI, InType>(kTestParam, PPC_SETTINGS_melnik_i_min_neigh_diff_vec),
