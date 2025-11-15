@@ -2,7 +2,6 @@
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
@@ -10,7 +9,6 @@
 #include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
-#include "util/include/util.hpp"
 
 namespace melnik_i_min_neigh_diff_vec {
 
@@ -21,7 +19,7 @@ MelnikIMinNeighDiffVecMPI::MelnikIMinNeighDiffVecMPI(const InType &in) {
 }
 
 bool MelnikIMinNeighDiffVecMPI::ValidationImpl() {
-  int rank;
+  int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   int is_valid = 1;
@@ -41,8 +39,9 @@ bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
 }
 
 bool MelnikIMinNeighDiffVecMPI::RunImpl() {
-  int rank, comm_size;
+  int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  int comm_size = 1;
   MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
   const auto &global_input = GetInput();
