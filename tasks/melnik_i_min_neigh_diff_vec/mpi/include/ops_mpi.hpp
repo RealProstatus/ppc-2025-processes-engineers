@@ -17,6 +17,25 @@ class MelnikIMinNeighDiffVecMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
+
+  struct Result {
+    int diff = std::numeric_limits<int>::max();
+    int index = -1;
+  };
+
+  void GetMpiRankAndSize(int &rank, int &comm_size) const;
+  bool BroadcastGlobalSize(int &global_size, int rank);
+  void PrepareCountsAndDispls(std::vector<int> &counts, std::vector<int> &displs, int global_size, int comm_size,
+                              int rank) const;
+  void ScatterLocalSize(int &local_size, const std::vector<int> &counts) const;
+  void ScatterData(std::vector<int> &local_data, const std::vector<int> &counts, const std::vector<int> &displs,
+                   int rank);
+  int ComputeLocalDispl(int local_size) const;
+  void ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size, int local_displ) const;
+  void HandleBoundaryDiffs(Result &local_res, int local_size, const std::vector<int> &local_data, int local_displ,
+                           int rank, int comm_size) const;
+  void ReduceAndBroadcastResult(Result &global_res, const Result &local_res) const;
+  bool SetOutputFromGlobalResult(const Result &global_res);
 };
 
 }  // namespace melnik_i_min_neigh_diff_vec
