@@ -1,10 +1,12 @@
 #include "melnik_i_min_neigh_diff_vec/seq/include/ops_seq.hpp"
 
-#include <numeric>
+#include <stdlib.h>
+
+#include <ranges>
+#include <tuple>
 #include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
-#include "util/include/util.hpp"
 
 namespace melnik_i_min_neigh_diff_vec {
 
