@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <limits>
+#include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
 #include "task/include/task.hpp"
