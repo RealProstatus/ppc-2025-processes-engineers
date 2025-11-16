@@ -1,5 +1,8 @@
 #pragma once
 
+#include <vector>
+#include <limits>
+
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
 #include "task/include/task.hpp"
 
@@ -30,7 +33,7 @@ class MelnikIMinNeighDiffVecMPI : public BaseTask {
   void ScatterLocalSize(int &local_size, const std::vector<int> &counts) const;
   void ScatterData(std::vector<int> &local_data, const std::vector<int> &counts, const std::vector<int> &displs,
                    int rank);
-  int ComputeLocalDispl(int local_size) const;
+  [[nodiscard]] int ComputeLocalDispl(int local_size) const;
   void ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size, int local_displ) const;
   void HandleBoundaryDiffs(Result &local_res, int local_size, const std::vector<int> &local_data, int local_displ,
                            int rank, int comm_size) const;
