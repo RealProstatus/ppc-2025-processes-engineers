@@ -38,41 +38,6 @@ bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
   return true;
 }
 
-static void MelnikIMinNeighDiffVecMPI::GetMpiRankAndSize(int &rank, int &comm_size) const {
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
-}
-
-bool MelnikIMinNeighDiffVecMPI::BroadcastGlobalSize(int &global_size, int rank) {
-  if (rank == 0) {
-    global_size = static_cast<int>(this->GetInput().size());
-  }
-  MPI_Bcast(&global_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-  if (global_size < 2) {
-    return false;
-  }
-  return true;
-}
-
-static void MelnikIMinNeighDiffVecMPI::PrepareCountsAndDispls(std::vector<int> &counts, std::vector<int> &displs,
-                                                       int global_size, int comm_size, int rank) const {
-  if (rank == 0) {
-    int base = global_size / comm_size;
-    int rem = global_size % comm_size;
-    int offset = 0;
-    for (int i = 0; i < comm_size; ++i) {
-      counts[i] = base + (i < rem ? 1 : 0);
-      displs[i] = offset;
-      offset += counts[i];
-    }
-  }
-}
-
-static void MelnikIMinNeighDiffVecMPI::ScatterLocalSize(int &local_size, const std::vector<int> &counts) const {
-  MPI_Scatter(counts.data(), 1, MPI_INT, &local_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-}
-
 void MelnikIMinNeighDiffVecMPI::ScatterData(std::vector<int> &local_data, const std::vector<int> &counts,
                                             const std::vector<int> &displs, int rank) {
   const int *sendbuf = (rank == 0) ? this->GetInput().data() : nullptr;
@@ -80,14 +45,7 @@ void MelnikIMinNeighDiffVecMPI::ScatterData(std::vector<int> &local_data, const 
                static_cast<int>(local_data.size()), MPI_INT, 0, MPI_COMM_WORLD);
 }
 
-static int MelnikIMinNeighDiffVecMPI::ComputeLocalDispl(int local_size) const {
-  int local_displ = 0;
-  MPI_Scan(&local_size, &local_displ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-  local_displ -= local_size;
-  return local_displ;
-}
-
-static void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size,
+void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size,
                                                 int local_displ) const {
   local_res.diff = std::numeric_limits<int>::max();
   local_res.index = -1;
@@ -102,7 +60,7 @@ static void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const 
   }
 }
 
-static void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local_size,
+void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local_size,
                                                     const std::vector<int> &local_data, int local_displ, int rank,
                                                     int comm_size) const {
   int left_boundary = local_size > 0 ? local_data.front() : 0;
@@ -151,40 +109,48 @@ static void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, in
   }
 }
 
-static void MelnikIMinNeighDiffVecMPI::ReduceAndBroadcastResult(Result &global_res, const Result &local_res) const {
+void MelnikIMinNeighDiffVecMPI::ReduceAndBroadcastResult(Result &global_res, const Result &local_res) const {
   MPI_Reduce(&local_res, &global_res, 1, MPI_2INT, MPI_MINLOC, 0, MPI_COMM_WORLD);
   MPI_Bcast(&global_res, 1, MPI_2INT, 0, MPI_COMM_WORLD);
 }
 
-bool MelnikIMinNeighDiffVecMPI::SetOutputFromGlobalResult(const Result &global_res) {
-  if (global_res.index >= 0) {
-    GetOutput() = std::make_tuple(global_res.index, global_res.index + 1);
-    return true;
-  }
-  return false;
-}
-
 bool MelnikIMinNeighDiffVecMPI::RunImpl() {
   int rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   int comm_size = 1;
-  GetMpiRankAndSize(rank, comm_size);
+  MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
 
   int global_size = 0;
-  if (!BroadcastGlobalSize(global_size, rank)) {
+  if (rank == 0) {
+    global_size = static_cast<int>(this->GetInput().size());
+  }
+  MPI_Bcast(&global_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  if (global_size < 2) {
     return false;
   }
 
   std::vector<int> counts(comm_size);
   std::vector<int> displs(comm_size);
-  PrepareCountsAndDispls(counts, displs, global_size, comm_size, rank);
+  if (rank == 0) {
+    int base = global_size / comm_size;
+    int rem = global_size % comm_size;
+    int offset = 0;
+    for (int i = 0; i < comm_size; ++i) {
+      counts[i] = base + (i < rem ? 1 : 0);
+      displs[i] = offset;
+      offset += counts[i];
+    }
+  }
 
   int local_size = 0;
-  ScatterLocalSize(local_size, counts);
+  MPI_Scatter(counts.data(), 1, MPI_INT, &local_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
   std::vector<int> local_data(local_size);
   ScatterData(local_data, counts, displs, rank);
 
-  int local_displ = ComputeLocalDispl(local_size);
+  int local_displ = 0;
+  MPI_Scan(&local_size, &local_displ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  local_displ -= local_size;
 
   Result local_res;
   ComputeLocalMin(local_res, local_data, local_size, local_displ);
@@ -196,7 +162,11 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
   Result global_res;
   ReduceAndBroadcastResult(global_res, local_res);
 
-  return SetOutputFromGlobalResult(global_res);
+  if (global_res.index >= 0) {
+    GetOutput() = std::make_tuple(global_res.index, global_res.index + 1);
+    return true;
+  }
+  return false;
 }
 
 bool MelnikIMinNeighDiffVecMPI::PostProcessingImpl() {
