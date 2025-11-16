@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <array>
 #include <cstddef>
