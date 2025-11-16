@@ -1,8 +1,7 @@
 #include "melnik_i_min_neigh_diff_vec/seq/include/ops_seq.hpp"
 
-#include <cstdlib>
 #include <algorithm>
-
+#include <cstdlib>
 #include <ranges>
 #include <tuple>
 #include <vector>
