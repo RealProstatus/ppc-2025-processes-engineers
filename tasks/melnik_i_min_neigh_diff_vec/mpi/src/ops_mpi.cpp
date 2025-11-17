@@ -50,7 +50,7 @@ void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const std::ve
   local_res.delta = std::numeric_limits<int>::max();
   local_res.index = -1;
   if (local_size >= 2) {
-    for (int i = 0; i < local_size - 1; ++i) {
+    for (int i = 0; i < local_size - 1; i++) {
       int cur_diff = std::abs(local_data[i + 1] - local_data[i]);
       if (cur_diff < local_res.delta || (cur_diff == local_res.delta && (local_displ + i) < local_res.index)) {
         local_res.delta = cur_diff;
@@ -155,7 +155,7 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
     int base = global_size / comm_size;
     int rem = global_size % comm_size;
     int offset = 0;
-    for (int i = 0; i < comm_size; ++i) {
+    for (int i = 0; i < comm_size; i++) {
       counts[i] = base + (i < rem ? 1 : 0);
       displs[i] = offset;
       offset += counts[i];
