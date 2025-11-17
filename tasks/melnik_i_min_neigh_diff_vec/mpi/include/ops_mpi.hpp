@@ -31,6 +31,12 @@ class MelnikIMinNeighDiffVecMPI : public BaseTask {
   static void ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size, int local_displ);
   static void HandleBoundaryDiffs(Result &local_res, int local_size, const std::vector<int> &local_data,
                                   int local_displ, int rank, int comm_size);
+  static void PerformBoundaryCommunications(int left_boundary, int right_boundary, int &recv_from_left,
+                                            int &recv_from_right, int rank, int comm_size);
+  static void UpdateResultWithBoundaryDiffs(Result &local_res, int left_boundary, int right_boundary,
+                                            int recv_from_left, int recv_from_right, int local_displ, int local_size,
+                                            int rank, int comm_size);
+  static void UpdateLocalResult(Result &local_res, int boundary_diff, int boundary_idx);
   static void ReduceAndBroadcastResult(Result &global_res, const Result &local_res);
 };
 
