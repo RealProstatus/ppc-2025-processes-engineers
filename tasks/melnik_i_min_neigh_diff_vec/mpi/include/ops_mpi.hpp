@@ -40,7 +40,7 @@ class MelnikIMinNeighDiffVecMPI : public BaseTask {
   static void UpdateResultWithBoundaryDiffs(Result &local_res, int left_boundary, int right_boundary,
                                             int recv_from_left, int recv_from_right, int local_displ, int local_size,
                                             int rank, int comm_size);
-  static void UpdateLocalResult(Result &local_res, int boundary_diff, int boundary_idx);
+  static void UpdateLocalResult(Result &local_res, int boundary_delta, int boundary_idx);
   static void ReduceAndBroadcastResult(Result &global_res, const Result &local_res);
 };
 
