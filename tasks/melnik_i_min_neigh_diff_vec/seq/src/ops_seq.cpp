@@ -25,24 +25,19 @@ bool MelnikIMinNeighDiffVecSEQ::PreProcessingImpl() {
 }
 
 bool MelnikIMinNeighDiffVecSEQ::RunImpl() {
-  const auto &input = GetInput();
-  if (input.size() < 2) {
-    return false;
+  const auto &v = GetInput();
+
+  int best_idx = 0;
+  int best_diff = std::abs(v[1] - v[0]);
+  for (size_t i = 1; i + 1 < v.size(); i++) {
+    int delta = std::abs(v[i + 1] - v[i]);
+    if (delta < best_diff || (delta == best_diff && static_cast<int>(i) < best_idx)) {
+      best_diff = delta;
+      best_idx = static_cast<int>(i);
+    }
   }
 
-  auto iota_range = std::views::iota(size_t{0}, input.size() - 1);
-  auto comparator = [&](size_t i, size_t j) {
-    int diff_i = std::abs(input[i] - input[i + 1]);
-    int diff_j = std::abs(input[j] - input[j + 1]);
-    if (diff_i == diff_j) {
-      return i < j;
-    }
-    return diff_i < diff_j;
-  };
-  auto min_it = std::ranges::min_element(iota_range, comparator);
-  int min_idx = static_cast<int>(*min_it);
-
-  GetOutput() = std::make_tuple(min_idx, min_idx + 1);
+  GetOutput() = std::make_tuple(best_idx, best_idx + 1);
   return true;
 }
 
