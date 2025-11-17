@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 #include <tuple>
@@ -65,22 +66,14 @@ TEST_P(MelnikIMinNeighDiffVecRunFuncTestsProcesses, MinNeighDiffTest) {
 }
 
 // Тестовые параметры: (вектор, описание)
-const std::array<TestType, 15> kTestParam = {
-    // 1. Простые
+const std::array<TestType, 20> kTestParam = {
     std::make_tuple(std::vector<int>{1, 2, 3, 4}, "basic_increasing_4"),
-    // 2. Нули
     std::make_tuple(std::vector<int>{0, 0, 0, 0}, "all_zero"),
-    // 3. Только отрицательные
     std::make_tuple(std::vector<int>{-4, -3, -2, -1}, "negative_increasing"),
-    // 4. Смешанные
     std::make_tuple(std::vector<int>{1, -1, 2, -2, 3, -3}, "alternating_signs"),
-    // 5. Большие числа
     std::make_tuple(std::vector<int>{10000, 10001, 30000, 30001}, "large_numbers_small_diffs"),
-    // 6. Короткий случай
     std::make_tuple(std::vector<int>{7, 9}, "two_elements"),
-    // 7. Много одинаковых
     std::make_tuple(std::vector<int>(100, 5), "constant_100"),
-    // 8. Вектор длиной 1000 с разными разницами
     std::make_tuple(
         [] {
   std::vector<int> v(1000);
@@ -89,7 +82,6 @@ const std::array<TestType, 15> kTestParam = {
   }
   return v;
 }(), "size_1000_varied"),
-    // 9. Рандом-подобный 1
     std::make_tuple(
         [] {
   std::vector<int> v(50);
@@ -98,7 +90,6 @@ const std::array<TestType, 15> kTestParam = {
   }
   return v;
 }(), "random_like_case_1"),
-    // 10. Рандом-подобный 2
     std::make_tuple(
         [] {
   std::vector<int> v(60);
@@ -107,9 +98,7 @@ const std::array<TestType, 15> kTestParam = {
   }
   return v;
 }(), "random_like_case_2"),
-    // 11. Половина нулей
     std::make_tuple(std::vector<int>{0, 1, 0, 1, 0, 1}, "half_zero"),
-    // 12. Восходящая последовательность с минимальной разницей в конце
     std::make_tuple(
         [] {
   std::vector<int> v(100);
@@ -119,16 +108,14 @@ const std::array<TestType, 15> kTestParam = {
   v[99] = v[98] + 1;  // Min diff at end
   return v;
 }(), "ascending_with_min_at_end"),
-    // 13. Большой тест (5000 элементов)
     std::make_tuple(std::vector<int>(5000, 3), "constant_5000"),
-    // 14. Очень большие положительные/отрицательные
     std::make_tuple(std::vector<int>{1000000, 1000001, -1000000, -999999}, "extreme_values"),
-    // 15. Векторы с равными разницами
-    std::make_tuple(std::vector<int>{1, 2, 3, 4, 5}, "equal_diffs_should_pick_first")};
-// 16. Пустой вектор
-// std::make_tuple(std::vector<int>{}, "empty_vector"),
-// 17. Один элемент
-// std::make_tuple(std::vector<int>{42}, "single_element")};
+    std::make_tuple(std::vector<int>{1, 2, 3, 4, 5}, "equal_diffs_should_pick_first"),
+    std::make_tuple(std::vector<int>{10, 8, 6, 4, 2}, "decreasing_sequence"),
+    std::make_tuple(std::vector<int>{5, 6, 10, 15, 20}, "min_diff_at_start"),
+    std::make_tuple(std::vector<int>{10, 15, 18, 19, 25, 30}, "min_diff_at_middle"),
+    std::make_tuple(std::vector<int>{1, 2, 4, 5, 7, 8}, "alternating_min_diffs"),
+    std::make_tuple(std::vector<int>{0, 1, 3, 5, 7, 0}, "zeros_at_ends")};
 
 const auto kTestTasksList = std::tuple_cat(
     ppc::util::AddFuncTask<MelnikIMinNeighDiffVecMPI, InType>(kTestParam, PPC_SETTINGS_melnik_i_min_neigh_diff_vec),
