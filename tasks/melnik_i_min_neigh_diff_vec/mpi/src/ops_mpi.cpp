@@ -62,41 +62,51 @@ void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const std::ve
 
 void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local_size,
                                                     const std::vector<int> &local_data, int local_displ, int rank,
-                                                    int comm_size) {
-  if (local_size <= 0) {
-    return;
-  }
-
-  int left_boundary = local_data.front();
-  int right_boundary = local_data.back();
+                                                    int comm_size) const {
+  int left_boundary = local_size > 0 ? local_data.front() : 0;
+  int right_boundary = local_size > 0 ? local_data.back() : 0;
 
   int recv_from_left = 0;
   int recv_from_right = 0;
 
-  std::array<MPI_Request, 4> requests;
+  std::array<MPI_Request, 4> requests = {MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL};
+  int req_count = 0;
 
-  int left_dest = rank > 0 ? rank - 1 : MPI_PROC_NULL;
-  int left_src = rank > 0 ? rank - 1 : MPI_PROC_NULL;
-  int right_src = rank < comm_size - 1 ? rank + 1 : MPI_PROC_NULL;
-  int right_dest = rank < comm_size - 1 ? rank + 1 : MPI_PROC_NULL;
+  if (rank > 0) {
+    MPI_Isend(&left_boundary, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &requests.at(req_count));
+    ++req_count;
+    MPI_Irecv(&recv_from_left, 1, MPI_INT, rank - 1, 1, MPI_COMM_WORLD, &requests.at(req_count));
+    ++req_count;
+  }
 
-  MPI_Isend(&left_boundary, 1, MPI_INT, left_dest, 0, MPI_COMM_WORLD, &requests[0]);
-  MPI_Irecv(&recv_from_left, 1, MPI_INT, left_src, 1, MPI_COMM_WORLD, &requests[1]);
-  MPI_Irecv(&recv_from_right, 1, MPI_INT, right_src, 0, MPI_COMM_WORLD, &requests[2]);
-  MPI_Isend(&right_boundary, 1, MPI_INT, right_dest, 1, MPI_COMM_WORLD, &requests[3]);
+  if (rank < comm_size - 1) {
+    MPI_Irecv(&recv_from_right, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD, &requests.at(req_count));
+    ++req_count;
+    MPI_Isend(&right_boundary, 1, MPI_INT, rank + 1, 1, MPI_COMM_WORLD, &requests.at(req_count));
+    ++req_count;
+  }
 
-  MPI_Waitall(4, requests.data(), MPI_STATUSES_IGNORE);
+  if (req_count > 0) {
+    MPI_Waitall(req_count, requests.data(), MPI_STATUSES_IGNORE);
+  }
 
-  int max_diff = std::numeric_limits<int>::max();
-  int max_idx = std::numeric_limits<int>::max();
+  if (rank > 0 && local_size > 0) {
+    int boundary_diff = std::abs(left_boundary - recv_from_left);
+    int boundary_idx = local_displ - 1;
+    if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+      local_res.diff = boundary_diff;
+      local_res.index = boundary_idx;
+    }
+  }
 
-  int left_diff = rank > 0 ? std::abs(left_boundary - recv_from_left) : max_diff;
-  int left_idx = rank > 0 ? local_displ - 1 : max_idx;
-  UpdateMin(local_res, left_diff, left_idx);
-
-  int right_diff = rank < comm_size - 1 ? std::abs(recv_from_right - right_boundary) : max_diff;
-  int right_idx = rank < comm_size - 1 ? local_displ + local_size - 1 : max_idx;
-  UpdateMin(local_res, right_diff, right_idx);
+  if (rank < comm_size - 1 && local_size > 0) {
+    int boundary_diff = std::abs(recv_from_right - right_boundary);
+    int boundary_idx = local_displ + local_size - 1;
+    if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+      local_res.diff = boundary_diff;
+      local_res.index = boundary_idx;
+    }
+  }
 }
 
 void MelnikIMinNeighDiffVecMPI::ReduceAndBroadcastResult(Result &global_res, const Result &local_res) const {
