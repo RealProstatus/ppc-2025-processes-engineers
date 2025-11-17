@@ -63,17 +63,22 @@ void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const std::ve
 void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local_size,
                                                     const std::vector<int> &local_data, int local_displ, int rank,
                                                     int comm_size) {
-  int left_boundary = 0;
-  int right_boundary = 0;
-
-  if (local_size > 0) {
-    left_boundary = local_data.front();
-    right_boundary = local_data.back();
-  }
-
+  int left_boundary = (local_size > 0) ? local_data.front() : 0;
+  int right_boundary = (local_size > 0) ? local_data.back() : 0;
   int recv_from_left = 0;
   int recv_from_right = 0;
 
+  PerformBoundaryCommunications(left_boundary, right_boundary, recv_from_left, recv_from_right, rank, comm_size);
+
+  if (local_size > 0) {
+    UpdateResultWithBoundaryDiffs(local_res, left_boundary, right_boundary, recv_from_left, recv_from_right,
+                                  local_displ, local_size, rank, comm_size);
+  }
+}
+
+void MelnikIMinNeighDiffVecMPI::PerformBoundaryCommunications(int left_boundary, int right_boundary,
+                                                              int &recv_from_left, int &recv_from_right, int rank,
+                                                              int comm_size) {
   std::array<MPI_Request, 4> requests = {MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL};
   int req_count = 0;
 
@@ -94,25 +99,28 @@ void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local
   if (req_count > 0) {
     MPI_Waitall(req_count, requests.data(), MPI_STATUSES_IGNORE);
   }
+}
 
-  if (local_size > 0) {
-    if (rank > 0) {
-      int boundary_diff = std::abs(left_boundary - recv_from_left);
-      int boundary_idx = local_displ - 1;
-      if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
-        local_res.diff = boundary_diff;
-        local_res.index = boundary_idx;
-      }
-    }
+void MelnikIMinNeighDiffVecMPI::UpdateResultWithBoundaryDiffs(Result &local_res, int left_boundary, int right_boundary,
+                                                              int recv_from_left, int recv_from_right, int local_displ,
+                                                              int local_size, int rank, int comm_size) {
+  if (rank > 0) {
+    int boundary_diff = std::abs(left_boundary - recv_from_left);
+    int boundary_idx = local_displ - 1;
+    UpdateLocalResult(local_res, boundary_diff, boundary_idx);
+  }
 
-    if (rank < comm_size - 1) {
-      int boundary_diff = std::abs(recv_from_right - right_boundary);
-      int boundary_idx = local_displ + local_size - 1;
-      if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
-        local_res.diff = boundary_diff;
-        local_res.index = boundary_idx;
-      }
-    }
+  if (rank < comm_size - 1) {
+    int boundary_diff = std::abs(recv_from_right - right_boundary);
+    int boundary_idx = local_displ + local_size - 1;
+    UpdateLocalResult(local_res, boundary_diff, boundary_idx);
+  }
+}
+
+void MelnikIMinNeighDiffVecMPI::UpdateLocalResult(Result &local_res, int boundary_diff, int boundary_idx) {
+  if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
+    local_res.diff = boundary_diff;
+    local_res.index = boundary_idx;
   }
 }
 
