@@ -38,7 +38,7 @@ class MelnikIMinNeighDiffVecRunFuncTestsProcesses : public ppc::util::BaseRunFun
 
     std::uint64_t expected_idx = 0;
     int min_diff = std::abs(vector[1] - vector[0]);
-    for (std::uint64_t i = 1; i < vector.size() - 1; ++i) {
+    for (std::uint64_t i = 1; i < vector.size() - 1; i++) {
       int curr_diff = std::abs(vector[i + 1] - vector[i]);
       if (curr_diff < min_diff || (curr_diff == min_diff && i < expected_idx)) {
         min_diff = curr_diff;
@@ -76,7 +76,7 @@ const std::array<TestType, 20> kTestParam = {
     std::make_tuple(
         [] {
   std::vector<int> v(1000);
-  for (int i = 0; i < 1000; ++i) {
+  for (int i = 0; i < 1000; i++) {
     v[i] = i % 100;
   }
   return v;
@@ -84,7 +84,7 @@ const std::array<TestType, 20> kTestParam = {
     std::make_tuple(
         [] {
   std::vector<int> v(50);
-  for (int i = 0; i < 50; ++i) {
+  for (int i = 0; i < 50; i++) {
     v[i] = (i * 3 % 50) - 25;
   }
   return v;
@@ -92,7 +92,7 @@ const std::array<TestType, 20> kTestParam = {
     std::make_tuple(
         [] {
   std::vector<int> v(60);
-  for (int i = 0; i < 60; ++i) {
+  for (int i = 0; i < 60; i++) {
     v[i] = ((i * 7) % 13) - 6;
   }
   return v;
@@ -101,7 +101,7 @@ const std::array<TestType, 20> kTestParam = {
     std::make_tuple(
         [] {
   std::vector<int> v(100);
-  for (int i = 0; i < 100; ++i) {
+  for (int i = 0; i < 100; i++) {
     v[i] = i * 2;
   }
   v[99] = v[98] + 1;  // Min diff at end
