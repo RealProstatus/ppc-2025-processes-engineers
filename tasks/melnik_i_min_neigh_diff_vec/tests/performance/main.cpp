@@ -16,8 +16,8 @@ class MelnikIMinNeighDiffVecRunPerfTestProcesses : public ppc::util::BaseRunPerf
   void SetUp() override {
     const size_t vector_size = 100000000;
     std::vector<int> vector(vector_size);
-    for (size_t i = 0; i < vector_size; ++i) {
-      vector[i] = static_cast<int>(i % 1000) + (i % 2 == 0 ? 1 : -1);
+    for (size_t i = 0; i < vector_size; i++) {
+      vector[i] = static_cast<int>(i % 1000) + ((i & 1) == 0 ? 1 : -1);
     }
     input_data_ = vector;
   }
