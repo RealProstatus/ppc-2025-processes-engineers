@@ -28,10 +28,10 @@ class MelnikIMinNeighDiffVecMPI : public BaseTask {
 
   void ScatterData(std::vector<int> &local_data, const std::vector<int> &counts, const std::vector<int> &displs,
                    int rank);
-  void ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size, int local_displ) const;
-  void HandleBoundaryDiffs(Result &local_res, int local_size, const std::vector<int> &local_data, int local_displ,
-                           int rank, int comm_size) const;
-  void ReduceAndBroadcastResult(Result &global_res, const Result &local_res) const;
+  static void ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size, int local_displ);
+  static void HandleBoundaryDiffs(Result &local_res, int local_size, const std::vector<int> &local_data,
+                                  int local_displ, int rank, int comm_size);
+  static void ReduceAndBroadcastResult(Result &global_res, const Result &local_res);
 };
 
 }  // namespace melnik_i_min_neigh_diff_vec

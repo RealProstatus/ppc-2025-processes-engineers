@@ -35,18 +35,18 @@ class MelnikIMinNeighDiffVecRunFuncTestsProcesses : public ppc::util::BaseRunFun
     }
 
     // Вычисляем ожидаемый результат: минимальная разница и минимальный индекс при равенстве
-    size_t expected_idx = 0;
+    int expected_idx = 0;
     int min_diff = std::abs(vector[1] - vector[0]);
     for (size_t i = 1; i < vector.size() - 1; ++i) {
       int curr_diff = std::abs(vector[i + 1] - vector[i]);
-      if (curr_diff < min_diff || (curr_diff == min_diff && i < expected_idx)) {
+      if (curr_diff < min_diff || (curr_diff == min_diff && static_cast<int>(i) < expected_idx)) {
         min_diff = curr_diff;
         expected_idx = static_cast<int>(i);
       }
     }
 
     auto [first, second] = output_data;
-    return static_cast<size_t>(first) == expected_idx && static_cast<size_t>(second) == expected_idx + 1;
+    return first == expected_idx && second == expected_idx + 1;
   }
 
   InType GetTestInputData() final {
