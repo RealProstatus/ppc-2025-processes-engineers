@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
@@ -25,7 +26,7 @@ class MelnikIMinNeighDiffVecRunFuncTestsProcesses : public ppc::util::BaseRunFun
  protected:
   void SetUp() override {
     TestType params = std::get<static_cast<std::size_t>(ppc::util::GTestParamIndex::kTestParams)>(GetParam());
-    input_data_ = std::get<0>(params);  // Получаем вектор
+    input_data_ = std::get<0>(params);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
@@ -34,9 +35,9 @@ class MelnikIMinNeighDiffVecRunFuncTestsProcesses : public ppc::util::BaseRunFun
       return std::get<0>(output_data) == -1 && std::get<1>(output_data) == -1;
     }
 
-    long unsigned int expected_idx = 0;
+    std::uint64_t expected_idx = 0;
     int min_diff = std::abs(vector[1] - vector[0]);
-    for (long unsigned int i = 1; i < vector.size() - 1; ++i) {
+    for (std::uint64_t i = 1; i < vector.size() - 1; ++i) {
       int curr_diff = std::abs(vector[i + 1] - vector[i]);
       if (curr_diff < min_diff || (curr_diff == min_diff && i < expected_idx)) {
         min_diff = curr_diff;
@@ -45,8 +46,8 @@ class MelnikIMinNeighDiffVecRunFuncTestsProcesses : public ppc::util::BaseRunFun
     }
 
     auto [first, second] = output_data;
-    return static_cast<unsigned long int>(first) == expected_idx &&
-           static_cast<unsigned long int>(second) == expected_idx + 1;
+    return std::cmp_equal(static_cast<std::uint64_t>(first), expected_idx) &&
+           std::cmp_equal(static_cast<std::uint64_t>(second), expected_idx + 1);
   }
 
   InType GetTestInputData() final {
