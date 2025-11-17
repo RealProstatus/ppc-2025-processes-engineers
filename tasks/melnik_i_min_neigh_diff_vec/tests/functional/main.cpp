@@ -65,7 +65,6 @@ TEST_P(MelnikIMinNeighDiffVecRunFuncTestsProcesses, MinNeighDiffTest) {
   ExecuteTest(GetParam());
 }
 
-// Тестовые параметры: (вектор, описание)
 const std::array<TestType, 20> kTestParam = {
     std::make_tuple(std::vector<int>{1, 2, 3, 4}, "basic_increasing_4"),
     std::make_tuple(std::vector<int>{0, 0, 0, 0}, "all_zero"),
