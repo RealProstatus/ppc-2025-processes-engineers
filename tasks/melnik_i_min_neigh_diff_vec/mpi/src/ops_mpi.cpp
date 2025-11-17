@@ -79,7 +79,7 @@ void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local
 void MelnikIMinNeighDiffVecMPI::PerformBoundaryCommunications(int left_boundary, int right_boundary,
                                                               int &recv_from_left, int &recv_from_right, int rank,
                                                               int comm_size) {
-  // 4 operations maximum
+  // 4 operations maximum: send+recv from both neighbours
   std::array<MPI_Request, 4> requests = {MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL};
   int req_count = 0;
 
@@ -122,7 +122,7 @@ void MelnikIMinNeighDiffVecMPI::UpdateResultWithBoundaryDiffs(Result &local_res,
   }
 }
 
-// Separated fuctions for less nesting, clang-tidy complained a lot :)
+// Separated fuctions for less nesting, clang-tidy complained a lot
 
 void MelnikIMinNeighDiffVecMPI::UpdateLocalResult(Result &local_res, int boundary_delta, int boundary_idx) {
   if (boundary_delta < local_res.delta || (boundary_delta == local_res.delta && boundary_idx < local_res.index)) {
