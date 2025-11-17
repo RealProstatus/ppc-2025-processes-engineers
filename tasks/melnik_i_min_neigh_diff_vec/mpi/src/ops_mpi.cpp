@@ -47,13 +47,13 @@ void MelnikIMinNeighDiffVecMPI::ScatterData(std::vector<int> &local_data, const 
 
 void MelnikIMinNeighDiffVecMPI::ComputeLocalMin(Result &local_res, const std::vector<int> &local_data, int local_size,
                                                 int local_displ) {
-  local_res.diff = std::numeric_limits<int>::max();
+  local_res.delta = std::numeric_limits<int>::max();
   local_res.index = -1;
   if (local_size >= 2) {
     for (int i = 0; i < local_size - 1; ++i) {
-      int curr_diff = std::abs(local_data[i + 1] - local_data[i]);
-      if (curr_diff < local_res.diff || (curr_diff == local_res.diff && (local_displ + i) < local_res.index)) {
-        local_res.diff = curr_diff;
+      int cur_diff = std::abs(local_data[i + 1] - local_data[i]);
+      if (cur_diff < local_res.delta || (cur_diff == local_res.delta && (local_displ + i) < local_res.index)) {
+        local_res.delta = cur_diff;
         local_res.index = local_displ + i;
       }
     }
@@ -79,9 +79,11 @@ void MelnikIMinNeighDiffVecMPI::HandleBoundaryDiffs(Result &local_res, int local
 void MelnikIMinNeighDiffVecMPI::PerformBoundaryCommunications(int left_boundary, int right_boundary,
                                                               int &recv_from_left, int &recv_from_right, int rank,
                                                               int comm_size) {
+  // 4 operations maximum
   std::array<MPI_Request, 4> requests = {MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL, MPI_REQUEST_NULL};
   int req_count = 0;
 
+  // left neighbour
   if (rank > 0) {
     MPI_Isend(&left_boundary, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, &requests.at(req_count));
     ++req_count;
@@ -89,6 +91,7 @@ void MelnikIMinNeighDiffVecMPI::PerformBoundaryCommunications(int left_boundary,
     ++req_count;
   }
 
+  // right neighbour
   if (rank < comm_size - 1) {
     MPI_Irecv(&recv_from_right, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD, &requests.at(req_count));
     ++req_count;
@@ -104,22 +107,26 @@ void MelnikIMinNeighDiffVecMPI::PerformBoundaryCommunications(int left_boundary,
 void MelnikIMinNeighDiffVecMPI::UpdateResultWithBoundaryDiffs(Result &local_res, int left_boundary, int right_boundary,
                                                               int recv_from_left, int recv_from_right, int local_displ,
                                                               int local_size, int rank, int comm_size) {
+  // left neighbour result vs left boundary
   if (rank > 0) {
-    int boundary_diff = std::abs(left_boundary - recv_from_left);
+    int boundary_delta = std::abs(left_boundary - recv_from_left);
     int boundary_idx = local_displ - 1;
-    UpdateLocalResult(local_res, boundary_diff, boundary_idx);
+    UpdateLocalResult(local_res, boundary_delta, boundary_idx);
   }
 
+  // right neighbour result vs right boundary
   if (rank < comm_size - 1) {
-    int boundary_diff = std::abs(recv_from_right - right_boundary);
+    int boundary_delta = std::abs(recv_from_right - right_boundary);
     int boundary_idx = local_displ + local_size - 1;
-    UpdateLocalResult(local_res, boundary_diff, boundary_idx);
+    UpdateLocalResult(local_res, boundary_delta, boundary_idx);
   }
 }
 
-void MelnikIMinNeighDiffVecMPI::UpdateLocalResult(Result &local_res, int boundary_diff, int boundary_idx) {
-  if (boundary_diff < local_res.diff || (boundary_diff == local_res.diff && boundary_idx < local_res.index)) {
-    local_res.diff = boundary_diff;
+// Separated fuctions for less nesting, clang-tidy complained a lot :)
+
+void MelnikIMinNeighDiffVecMPI::UpdateLocalResult(Result &local_res, int boundary_delta, int boundary_idx) {
+  if (boundary_delta < local_res.delta || (boundary_delta == local_res.delta && boundary_idx < local_res.index)) {
+    local_res.delta = boundary_delta;
     local_res.index = boundary_idx;
   }
 }
@@ -140,10 +147,8 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
     global_size = static_cast<int>(this->GetInput().size());
   }
   MPI_Bcast(&global_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  if (global_size < 2) {
-    return false;
-  }
 
+  // Distribution with remainder
   std::vector<int> counts(comm_size);
   std::vector<int> displs(comm_size);
   if (rank == 0) {
@@ -163,6 +168,7 @@ bool MelnikIMinNeighDiffVecMPI::RunImpl() {
   std::vector<int> local_data(local_size);
   ScatterData(local_data, counts, displs, rank);
 
+  // Compute displacement
   int local_displ = 0;
   MPI_Scan(&local_size, &local_displ, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   local_displ -= local_size;
