@@ -88,7 +88,7 @@ const std::array<TestType, 20> kTestParam = {
     v[i] = (i * 3 % 50) - 25;
   }
   return v;
-}(), "random_like_case_1"),
+}(), "random_case_1"),
     std::make_tuple(
         [] {
   std::vector<int> v(60);
@@ -96,7 +96,7 @@ const std::array<TestType, 20> kTestParam = {
     v[i] = ((i * 7) % 13) - 6;
   }
   return v;
-}(), "random_like_case_2"),
+}(), "random_case_2"),
     std::make_tuple(std::vector<int>{0, 1, 0, 1, 0, 1}, "half_zero"),
     std::make_tuple(
         [] {
