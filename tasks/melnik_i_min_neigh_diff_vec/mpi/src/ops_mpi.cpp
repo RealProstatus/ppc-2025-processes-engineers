@@ -22,16 +22,13 @@ bool MelnikIMinNeighDiffVecMPI::ValidationImpl() {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  int is_valid = 1;
+  int global_size = 0;
   if (rank == 0) {
-    const auto &input = GetInput();
-    if (input.size() < 2) {
-      is_valid = 0;
-    }
+    global_size = static_cast<int>(GetInput().size());
   }
 
-  MPI_Bcast(&is_valid, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  return is_valid != 0;
+  MPI_Bcast(&global_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  return global_size >= 2;
 }
 
 bool MelnikIMinNeighDiffVecMPI::PreProcessingImpl() {
