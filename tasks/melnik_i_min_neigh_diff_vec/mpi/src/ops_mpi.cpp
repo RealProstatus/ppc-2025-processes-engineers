@@ -108,23 +108,20 @@ void MelnikIMinNeighDiffVecMPI::UpdateResultWithBoundaryDiffs(Result &local_res,
   if (rank > 0) {
     int boundary_delta = std::abs(left_boundary - recv_from_left);
     int boundary_idx = local_displ - 1;
-    UpdateLocalResult(local_res, boundary_delta, boundary_idx);
+    if (boundary_delta < local_res.delta || (boundary_delta == local_res.delta && boundary_idx < local_res.index)) {
+      local_res.delta = boundary_delta;
+      local_res.index = boundary_idx;
+    }
   }
 
   // right neighbour result vs right boundary
   if (rank < comm_size - 1) {
     int boundary_delta = std::abs(recv_from_right - right_boundary);
     int boundary_idx = local_displ + local_size - 1;
-    UpdateLocalResult(local_res, boundary_delta, boundary_idx);
-  }
-}
-
-// Separated fuctions for less nesting, clang-tidy complained a lot
-
-void MelnikIMinNeighDiffVecMPI::UpdateLocalResult(Result &local_res, int boundary_delta, int boundary_idx) {
-  if (boundary_delta < local_res.delta || (boundary_delta == local_res.delta && boundary_idx < local_res.index)) {
-    local_res.delta = boundary_delta;
-    local_res.index = boundary_idx;
+    if (boundary_delta < local_res.delta || (boundary_delta == local_res.delta && boundary_idx < local_res.index)) {
+      local_res.delta = boundary_delta;
+      local_res.index = boundary_idx;
+    }
   }
 }
 
