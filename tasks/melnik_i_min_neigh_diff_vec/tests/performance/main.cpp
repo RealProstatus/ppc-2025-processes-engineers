@@ -14,9 +14,8 @@ namespace melnik_i_min_neigh_diff_vec {
 class MelnikIMinNeighDiffVecRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
   InType input_data_;
 
-  void SetUp() override {
+  void GenerateVector(unsigned int seed) {
     const size_t vector_size = 200000000;
-    const unsigned int seed = 3301;
 
     std::vector<int> vector(vector_size);
     std::mt19937 generator(seed);
@@ -25,7 +24,13 @@ class MelnikIMinNeighDiffVecRunPerfTestProcesses : public ppc::util::BaseRunPerf
     for (size_t i = 0; i < vector_size; i++) {
       vector[i] = distribution(generator);
     }
+
     input_data_ = vector;
+  }
+
+  void SetUp() override {
+    const unsigned int seed = 3301;
+    GenerateVector(seed);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
