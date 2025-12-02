@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <random>
 #include <vector>
 
 #include "melnik_i_min_neigh_diff_vec/common/include/common.hpp"
@@ -13,13 +14,23 @@ namespace melnik_i_min_neigh_diff_vec {
 class MelnikIMinNeighDiffVecRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
   InType input_data_;
 
-  void SetUp() override {
-    const size_t vector_size = 200000000;
+  void GenerateVector(unsigned int seed) {
+    const size_t vector_size = 500000000;
+
     std::vector<int> vector(vector_size);
+    std::mt19937 generator(seed);
+    std::uniform_int_distribution<int> distribution(-1000000, 1000000);
+
     for (size_t i = 0; i < vector_size; i++) {
-      vector[i] = static_cast<int>(i % 1000) + ((i & 1) == 0 ? 1 : -1);
+      vector[i] = distribution(generator);
     }
+
     input_data_ = vector;
+  }
+
+  void SetUp() override {
+    const unsigned int seed = 3301;
+    GenerateVector(seed);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
