@@ -74,31 +74,25 @@ const std::array<TestType, 25> kTestParam = {
                     std::vector<std::vector<double>>{{19, 22}, {43, 50}}),
 
     std::make_tuple(2, std::vector<std::vector<double>>{{1, 0}, {0, 1}},
-                    std::vector<std::vector<double>>{{1, 2}, {3, 4}},
-                    std::vector<std::vector<double>>{{1, 2}, {3, 4}}),
+                    std::vector<std::vector<double>>{{1, 2}, {3, 4}}, std::vector<std::vector<double>>{{1, 2}, {3, 4}}),
 
     std::make_tuple(3, std::vector<std::vector<double>>{{1, 1}, {1, 1}},
-                    std::vector<std::vector<double>>{{1, 1}, {1, 1}},
-                    std::vector<std::vector<double>>{{2, 2}, {2, 2}}),
+                    std::vector<std::vector<double>>{{1, 1}, {1, 1}}, std::vector<std::vector<double>>{{2, 2}, {2, 2}}),
 
     std::make_tuple(4, std::vector<std::vector<double>>{{2, 0}, {0, 2}},
-                    std::vector<std::vector<double>>{{3, 0}, {0, 3}},
-                    std::vector<std::vector<double>>{{6, 0}, {0, 6}}),
+                    std::vector<std::vector<double>>{{3, 0}, {0, 3}}, std::vector<std::vector<double>>{{6, 0}, {0, 6}}),
 
-    std::make_tuple(5, std::vector<std::vector<double>>{{1, 2, 3}},
-                    std::vector<std::vector<double>>{{4}, {5}, {6}},
+    std::make_tuple(5, std::vector<std::vector<double>>{{1, 2, 3}}, std::vector<std::vector<double>>{{4}, {5}, {6}},
                     std::vector<std::vector<double>>{{32}}),
 
-    std::make_tuple(6, std::vector<std::vector<double>>{{1}, {2}, {3}},
-                    std::vector<std::vector<double>>{{4, 5, 6}},
+    std::make_tuple(6, std::vector<std::vector<double>>{{1}, {2}, {3}}, std::vector<std::vector<double>>{{4, 5, 6}},
                     std::vector<std::vector<double>>{{4, 5, 6}, {8, 10, 12}, {12, 15, 18}}),
 
     std::make_tuple(7, std::vector<std::vector<double>>{{1}}, std::vector<std::vector<double>>{{1}},
                     std::vector<std::vector<double>>{{1}}),
 
     std::make_tuple(8, std::vector<std::vector<double>>{{0, 0}, {0, 0}},
-                    std::vector<std::vector<double>>{{1, 2}, {3, 4}},
-                    std::vector<std::vector<double>>{{0, 0}, {0, 0}}),
+                    std::vector<std::vector<double>>{{1, 2}, {3, 4}}, std::vector<std::vector<double>>{{0, 0}, {0, 0}}),
 
     std::make_tuple(9, std::vector<std::vector<double>>{{2}}, std::vector<std::vector<double>>{{3}},
                     std::vector<std::vector<double>>{{6}}),
@@ -112,8 +106,7 @@ const std::array<TestType, 25> kTestParam = {
                     std::vector<std::vector<double>>{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}),
 
     std::make_tuple(12, std::vector<std::vector<double>>{{0.5, 0.5}, {0.5, 0.5}},
-                    std::vector<std::vector<double>>{{2, 4}, {6, 8}},
-                    std::vector<std::vector<double>>{{4, 6}, {4, 6}}),
+                    std::vector<std::vector<double>>{{2, 4}, {6, 8}}, std::vector<std::vector<double>>{{4, 6}, {4, 6}}),
 
     std::make_tuple(13, std::vector<std::vector<double>>{{1, 1}, {1, 1}, {1, 1}},
                     std::vector<std::vector<double>>{{1, 1, 1}, {1, 1, 1}},
@@ -128,43 +121,32 @@ const std::array<TestType, 25> kTestParam = {
                     std::vector<std::vector<double>>{{1.9, 2.2}, {4.3, 5.0}}),
 
     std::make_tuple(16, std::vector<std::vector<double>>{{1, 2}, {3, 4}},
-                    std::vector<std::vector<double>>{{0, 0}, {0, 0}},
-                    std::vector<std::vector<double>>{{0, 0}, {0, 0}}),
+                    std::vector<std::vector<double>>{{0, 0}, {0, 0}}, std::vector<std::vector<double>>{{0, 0}, {0, 0}}),
 
     std::make_tuple(17, std::vector<std::vector<double>>{{1, 0}, {0, 0}},
-                    std::vector<std::vector<double>>{{0, 1}, {0, 0}},
-                    std::vector<std::vector<double>>{{0, 1}, {0, 0}}),
+                    std::vector<std::vector<double>>{{0, 1}, {0, 0}}, std::vector<std::vector<double>>{{0, 1}, {0, 0}}),
 
     std::make_tuple(18, std::vector<std::vector<double>>{{-1, 2}, {3, -4}},
                     std::vector<std::vector<double>>{{5, -6}, {-7, 8}},
                     std::vector<std::vector<double>>{{-19, 22}, {43, -50}}),
 
-    std::make_tuple(19,
-                    std::vector<std::vector<double>>{
-                        {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
-                    std::vector<std::vector<double>>{
-                        {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}},
-                    std::vector<std::vector<double>>{
-                        {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}}),
+    std::make_tuple(19, std::vector<std::vector<double>>{{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
+                    std::vector<std::vector<double>>{{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}},
+                    std::vector<std::vector<double>>{{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}}),
 
     std::make_tuple(20, std::vector<std::vector<double>>{{1, 2, 3, 4}},
-                    std::vector<std::vector<double>>{{1}, {2}, {3}, {4}},
-                    std::vector<std::vector<double>>{{30}}),
+                    std::vector<std::vector<double>>{{1}, {2}, {3}, {4}}, std::vector<std::vector<double>>{{30}}),
 
     std::make_tuple(21, std::vector<std::vector<double>>{{1}, {2}, {3}, {4}},
                     std::vector<std::vector<double>>{{1, 2, 3, 4}},
                     std::vector<std::vector<double>>{{1, 2, 3, 4}, {2, 4, 6, 8}, {3, 6, 9, 12}, {4, 8, 12, 16}}),
 
-    std::make_tuple(22,
-                    std::vector<std::vector<double>>{
-                        {1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {10, 11, 12}, {13, 14, 15}},
-                    std::vector<std::vector<double>>{
-                        {1, 0, 0, 0, 0}, {0, 1, 0, 0, 0}, {0, 0, 1, 0, 0}},
+    std::make_tuple(22, std::vector<std::vector<double>>{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}, {10, 11, 12}, {13, 14, 15}},
+                    std::vector<std::vector<double>>{{1, 0, 0, 0, 0}, {0, 1, 0, 0, 0}, {0, 0, 1, 0, 0}},
                     std::vector<std::vector<double>>{
                         {1, 2, 3, 0, 0}, {4, 5, 6, 0, 0}, {7, 8, 9, 0, 0}, {10, 11, 12, 0, 0}, {13, 14, 15, 0, 0}}),
 
-    std::make_tuple(23,
-                    std::vector<std::vector<double>>{{1, 2}, {3, 4}, {5, 6}, {7, 8}},
+    std::make_tuple(23, std::vector<std::vector<double>>{{1, 2}, {3, 4}, {5, 6}, {7, 8}},
                     std::vector<std::vector<double>>{{1, 2, 3}, {4, 5, 6}},
                     std::vector<std::vector<double>>{{9, 12, 15}, {19, 26, 33}, {29, 40, 51}, {39, 54, 69}}),
 
