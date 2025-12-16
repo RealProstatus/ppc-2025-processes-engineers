@@ -29,9 +29,9 @@ bool MelnikIMatrixMultRibbonMPI::ValidationImpl() {
 
   if (rank == 0) {
     rows_a_ = static_cast<int>(matrix_A_.size());
-    cols_a_ = static_cast<int>(matrix_A_[0].size());
+    cols_a_ = (rows_a_ > 0 && !matrix_A_[0].empty()) ? static_cast<int>(matrix_A_[0].size()) : 0;
     rows_b_ = static_cast<int>(matrix_B_.size());
-    cols_b_ = static_cast<int>(matrix_B_[0].size());
+    cols_b_ = (rows_b_ > 0 && !matrix_B_[0].empty()) ? static_cast<int>(matrix_B_[0].size()) : 0;
   }
 
   std::array<int, 4> sizes = {rows_a_, cols_a_, rows_b_, cols_b_};
@@ -65,8 +65,11 @@ bool MelnikIMatrixMultRibbonMPI::RunImpl() {
   int local_rows = 0;
   ScatterMatrixA(counts, displs, local_a_flat, local_rows, rows_a_, cols_a_, world_size);
 
-  std::vector<double> local_c_flat(static_cast<size_t>(local_rows) * static_cast<size_t>(cols_b_), 0.0);
-  ComputeLocalMultiplication(local_a_flat, b_flat, local_c_flat, local_rows, cols_a_, cols_b_);
+  std::vector<double> local_c_flat;
+  if (local_rows > 0 && cols_b_ > 0) {
+    local_c_flat.resize(static_cast<size_t>(local_rows) * static_cast<size_t>(cols_b_), 0.0);
+    ComputeLocalMultiplication(local_a_flat, b_flat, local_c_flat, local_rows, cols_a_, cols_b_);
+  }
 
   std::vector<double> final_result_flat;
   GatherMatrixC(final_result_flat, counts, displs, local_c_flat, local_rows, rows_a_, cols_b_, world_size);
@@ -110,7 +113,6 @@ void MelnikIMatrixMultRibbonMPI::ScatterMatrixA(std::vector<int> &counts, std::v
   }
 
   local_rows = counts[rank];
-  local_a_flat.resize(static_cast<size_t>(local_rows) * static_cast<size_t>(cols_a));
 
   std::vector<double> a_flat;
   if (rank == 0) {
@@ -129,8 +131,15 @@ void MelnikIMatrixMultRibbonMPI::ScatterMatrixA(std::vector<int> &counts, std::v
     senddispls[i] = displs[i] * cols_a;
   }
 
-  MPI_Scatterv(rank == 0 ? a_flat.data() : nullptr, sendcounts.data(), senddispls.data(), MPI_DOUBLE,
-               local_a_flat.data(), local_rows * cols_a, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  if (local_rows > 0 && cols_a > 0) {
+    local_a_flat.resize(static_cast<size_t>(local_rows) * static_cast<size_t>(cols_a));
+    MPI_Scatterv(rank == 0 ? a_flat.data() : nullptr, sendcounts.data(), senddispls.data(), MPI_DOUBLE,
+                 local_a_flat.data(), local_rows * cols_a, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  } else {
+    local_a_flat.clear();
+    MPI_Scatterv(rank == 0 ? a_flat.data() : nullptr, sendcounts.data(), senddispls.data(), MPI_DOUBLE, nullptr, 0,
+                 MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  }
 }
 
 void MelnikIMatrixMultRibbonMPI::ComputeLocalMultiplication(const std::vector<double> &local_a_flat,
@@ -169,8 +178,13 @@ void MelnikIMatrixMultRibbonMPI::GatherMatrixC(std::vector<double> &final_result
     final_result_flat.resize(static_cast<size_t>(rows_a) * static_cast<size_t>(cols_b), 0.0);
   }
 
-  MPI_Gatherv(local_c_flat.data(), local_rows * cols_b, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr,
-              recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  if (local_rows > 0 && cols_b > 0) {
+    MPI_Gatherv(local_c_flat.data(), local_rows * cols_b, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr,
+                recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  } else {
+    MPI_Gatherv(nullptr, 0, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr, recvcounts.data(),
+                recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  }
 }
 
 void MelnikIMatrixMultRibbonMPI::ConvertToMatrix(const std::vector<double> &final_result_flat, int rows_a, int cols_b) {
