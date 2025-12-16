@@ -94,8 +94,8 @@ void MelnikIMatrixMultRibbonMPI::BroadcastMatrixB(std::vector<double> &b_flat, i
 }
 
 void MelnikIMatrixMultRibbonMPI::ScatterMatrixA(std::vector<int> &counts, std::vector<int> &displs,
-                                                 std::vector<double> &local_a_flat, int &local_rows, int rows_a,
-                                                 int cols_a, int world_size) {
+                                                std::vector<double> &local_a_flat, int &local_rows, int rows_a,
+                                                int cols_a, int world_size) {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -153,8 +153,8 @@ void MelnikIMatrixMultRibbonMPI::ComputeLocalMultiplication(const std::vector<do
 }
 
 void MelnikIMatrixMultRibbonMPI::GatherMatrixC(std::vector<double> &final_result_flat, const std::vector<int> &counts,
-                                                const std::vector<int> &displs, const std::vector<double> &local_c_flat,
-                                                int local_rows, int rows_a, int cols_b, int world_size) {
+                                               const std::vector<int> &displs, const std::vector<double> &local_c_flat,
+                                               int local_rows, int rows_a, int cols_b, int world_size) {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -169,13 +169,11 @@ void MelnikIMatrixMultRibbonMPI::GatherMatrixC(std::vector<double> &final_result
     final_result_flat.resize(static_cast<size_t>(rows_a) * static_cast<size_t>(cols_b), 0.0);
   }
 
-  MPI_Gatherv(local_c_flat.data(), local_rows * cols_b, MPI_DOUBLE,
-              rank == 0 ? final_result_flat.data() : nullptr, recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0,
-              MPI_COMM_WORLD);
+  MPI_Gatherv(local_c_flat.data(), local_rows * cols_b, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr,
+              recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
-void MelnikIMatrixMultRibbonMPI::ConvertToMatrix(const std::vector<double> &final_result_flat, int rows_a,
-                                                  int cols_b) {
+void MelnikIMatrixMultRibbonMPI::ConvertToMatrix(const std::vector<double> &final_result_flat, int rows_a, int cols_b) {
   std::vector<std::vector<double>> result_matrix(rows_a, std::vector<double>(cols_b));
 
   for (int i = 0; i < rows_a; ++i) {
