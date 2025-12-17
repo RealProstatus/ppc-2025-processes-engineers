@@ -79,7 +79,13 @@ bool MelnikIMatrixMultRibbonMPI::RunImpl() {
   GatherMatrixC(final_result_flat, counts, displs, local_c_flat, rows_a_, cols_b_, world_size);
 
   if (rank == 0) {
-    ConvertToMatrix(final_result_flat, rows_a_, cols_b_);
+    const size_t expected_size = static_cast<size_t>(rows_a_) * static_cast<size_t>(cols_b_);
+    if (final_result_flat.size() == expected_size && expected_size > 0) {
+      ConvertToMatrix(final_result_flat, rows_a_, cols_b_);
+    } else {
+      GetOutput().clear();
+      return false;
+    }
   }
 
   return true;
@@ -198,7 +204,7 @@ void MelnikIMatrixMultRibbonMPI::GatherMatrixC(std::vector<double> &final_result
   }
 
   const int send_count = recvcounts[rank];
-  if (!local_c_flat.empty() && send_count > 0) {
+  if (send_count > 0) {
     MPI_Gatherv(local_c_flat.data(), send_count, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr,
                 recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
   } else {
