@@ -96,11 +96,18 @@ bool MelnikIMatrixMultRibbonMPI::RunImpl() {
 
 bool MelnikIMatrixMultRibbonMPI::PostProcessingImpl() {
   auto &output = GetOutput();
-  output.assign(rows_a_, std::vector<double>(cols_b_, 0.0));
-
+  output.clear();
+  output.resize(rows_a_);
   for (std::size_t i = 0; i < rows_a_; ++i) {
-    for (std::size_t j = 0; j < cols_b_; ++j) {
-      output[i][j] = flat_c_[(i * cols_b_) + j];
+    output[i].assign(cols_b_, 0.0);
+  }
+
+  const std::size_t total = rows_a_ * cols_b_;
+  if (flat_c_.size() >= total) {
+    for (std::size_t idx = 0; idx < total; ++idx) {
+      const std::size_t r = idx / cols_b_;
+      const std::size_t c = idx % cols_b_;
+      output[r][c] = flat_c_[idx];
     }
   }
 
