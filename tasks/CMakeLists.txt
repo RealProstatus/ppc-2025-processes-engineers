@@ -20,7 +20,7 @@ set(PPC_IMPLEMENTATIONS "all;mpi;omp;seq;stl;tbb" CACHE STRING "Implementations 
 file(
   GLOB subdirs
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${CMAKE_CURRENT_SOURCE_DIR}/melnik_i_matrix_mult_ribbon")
+  "${CMAKE_CURRENT_SOURCE_DIR}/*")
 foreach(sub IN LISTS subdirs)
   if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${sub}" AND NOT sub STREQUAL
                                                            "common")
