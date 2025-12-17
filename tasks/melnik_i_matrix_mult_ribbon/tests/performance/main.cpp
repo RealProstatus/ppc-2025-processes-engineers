@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
-#include <utility>
+#include <tuple>
 #include <vector>
 
 #include "melnik_i_matrix_mult_ribbon/common/include/common.hpp"
