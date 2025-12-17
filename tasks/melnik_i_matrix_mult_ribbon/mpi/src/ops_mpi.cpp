@@ -70,7 +70,7 @@ bool MelnikIMatrixMultRibbonMPI::RunImpl() {
   ScatterMatrixA(counts, displs, local_a_flat, local_rows, rows_a_, cols_a_, world_size);
 
   std::vector<double> local_c_flat;
-  if (local_rows > 0 && cols_b_ > 0) {
+  if (local_rows > 0 && cols_b_ > 0 && !local_a_flat.empty()) {
     local_c_flat.resize(static_cast<size_t>(local_rows) * static_cast<size_t>(cols_b_), 0.0);
     ComputeLocalMultiplication(local_a_flat, b_flat, local_c_flat, local_rows, cols_a_, cols_b_);
   }
@@ -204,7 +204,7 @@ void MelnikIMatrixMultRibbonMPI::GatherMatrixC(std::vector<double> &final_result
   }
 
   const int send_count = recvcounts[rank];
-  if (send_count > 0) {
+  if (send_count > 0 && !local_c_flat.empty()) {
     MPI_Gatherv(local_c_flat.data(), send_count, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr,
                 recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
   } else {
