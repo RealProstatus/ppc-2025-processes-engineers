@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <iostream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -33,20 +34,90 @@ class MelnikIMatrixMultRibbonRunFuncTestsProcesses : public ppc::util::BaseRunFu
 
   bool CheckTestOutputData(OutType &output_data) final {
     if (output_data.size() != expected_.size()) {
+      std::cerr << "\n=== DEBUG OUTPUT ===\n";
+      std::cerr << "Size mismatch: output=" << output_data.size() << ", expected=" << expected_.size() << "\n";
+      std::cerr << "Output matrix:\n";
+      for (size_t i = 0; i < output_data.size(); i++) {
+        std::cerr << "  [";
+        for (size_t j = 0; j < output_data[i].size(); j++) {
+          std::cerr << output_data[i][j];
+          if (j < output_data[i].size() - 1) {
+            std::cerr << ", ";
+          }
+        }
+        std::cerr << "]\n";
+      }
+      std::cerr << "Expected matrix:\n";
+      for (size_t i = 0; i < expected_.size(); i++) {
+        std::cerr << "  [";
+        for (size_t j = 0; j < expected_[i].size(); j++) {
+          std::cerr << expected_[i][j];
+          if (j < expected_[i].size() - 1) {
+            std::cerr << ", ";
+          }
+        }
+        std::cerr << "]\n";
+      }
+      std::cerr << "===================\n";
       return false;
     }
     if (!output_data.empty() && output_data[0].size() != expected_[0].size()) {
+      std::cerr << "\n=== DEBUG OUTPUT ===\n";
+      std::cerr << "Column size mismatch: output[0]=" << output_data[0].size()
+                << ", expected[0]=" << expected_[0].size() << "\n";
+      std::cerr << "===================\n";
       return false;
     }
 
     const double tolerance = 1e-10;
+    bool has_mismatch = false;
+    size_t mismatch_row = 0;
+    size_t mismatch_col = 0;
 
     for (size_t i = 0; i < expected_.size(); i++) {
       for (size_t j = 0; j < expected_[i].size(); j++) {
         if (std::abs(output_data[i][j] - expected_[i][j]) > tolerance) {
-          return false;
+          if (!has_mismatch) {
+            mismatch_row = i;
+            mismatch_col = j;
+            has_mismatch = true;
+          }
         }
       }
+    }
+
+    if (has_mismatch) {
+      std::cerr << "\n=== DEBUG OUTPUT ===\n";
+      std::cerr << "Value mismatch at position [" << mismatch_row << "][" << mismatch_col << "]\n";
+      std::cerr << "Output value: " << output_data[mismatch_row][mismatch_col] << "\n";
+      std::cerr << "Expected value: " << expected_[mismatch_row][mismatch_col] << "\n";
+      std::cerr << "Difference: "
+                << std::abs(output_data[mismatch_row][mismatch_col] - expected_[mismatch_row][mismatch_col]) << "\n";
+      std::cerr << "Tolerance: " << tolerance << "\n";
+      std::cerr << "\nFull output matrix:\n";
+      for (size_t i = 0; i < output_data.size(); i++) {
+        std::cerr << "  [";
+        for (size_t j = 0; j < output_data[i].size(); j++) {
+          std::cerr << output_data[i][j];
+          if (j < output_data[i].size() - 1) {
+            std::cerr << ", ";
+          }
+        }
+        std::cerr << "]\n";
+      }
+      std::cerr << "\nFull expected matrix:\n";
+      for (size_t i = 0; i < expected_.size(); i++) {
+        std::cerr << "  [";
+        for (size_t j = 0; j < expected_[i].size(); j++) {
+          std::cerr << expected_[i][j];
+          if (j < expected_[i].size() - 1) {
+            std::cerr << ", ";
+          }
+        }
+        std::cerr << "]\n";
+      }
+      std::cerr << "===================\n";
+      return false;
     }
 
     return true;
