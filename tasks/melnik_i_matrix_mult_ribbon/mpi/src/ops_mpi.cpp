@@ -221,8 +221,8 @@ void MelnikIMatrixMultRibbonMPI::GatherAndDistribute(const std::vector<int> &row
     flat_c_.assign(rows_a_ * cols_b_, 0.0);
   }
 
-  MPI_Gatherv(local_c.data(), counts[proc_rank_], MPI_DOUBLE, proc_rank_ == 0 ? flat_c_.data() : nullptr,
-              counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Gatherv(local_c.data(), counts[proc_rank_], MPI_DOUBLE, proc_rank_ == 0 ? flat_c_.data() : nullptr, counts.data(),
+              displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   // Broadcast assembled result so PostProcessing can run uniformly
   MPI_Bcast(flat_c_.data(), static_cast<int>(rows_a_ * cols_b_), MPI_DOUBLE, 0, MPI_COMM_WORLD);
