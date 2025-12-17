@@ -208,7 +208,7 @@ void MelnikIMatrixMultRibbonMPI::GatherMatrixC(std::vector<double> &final_result
 
   const int send_count = recvcounts[rank];
   if (send_count > 0) {
-    if (local_c_flat.size() >= static_cast<size_t>(send_count)) {
+    if (!local_c_flat.empty() && local_c_flat.size() >= static_cast<size_t>(send_count)) {
       MPI_Gatherv(local_c_flat.data(), send_count, MPI_DOUBLE, rank == 0 ? final_result_flat.data() : nullptr,
                   recvcounts.data(), recvdispls.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
     } else {
