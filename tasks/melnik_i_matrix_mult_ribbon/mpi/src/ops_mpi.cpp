@@ -18,8 +18,11 @@ MelnikIMatrixMultRibbonMPI::MelnikIMatrixMultRibbonMPI(const InType &in) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   if (rank == 0) {
-    matrix_A_ = std::get<0>(in);
-    matrix_B_ = std::get<1>(in);
+    GetInput() = in;
+    matrix_A_ = std::get<0>(GetInput());
+    matrix_B_ = std::get<1>(GetInput());
+  } else {
+    GetInput() = InType{};
   }
 }
 
@@ -81,17 +84,19 @@ bool MelnikIMatrixMultRibbonMPI::RunImpl() {
   std::vector<double> final_result_flat;
   GatherMatrixC(final_result_flat, counts, displs, local_c_flat, rows_a_, cols_b_, world_size);
 
+  int success_flag = 1;
   if (rank == 0) {
     const size_t expected_size = static_cast<size_t>(rows_a_) * static_cast<size_t>(cols_b_);
     if (final_result_flat.size() == expected_size && expected_size > 0) {
       ConvertToMatrix(final_result_flat, rows_a_, cols_b_);
     } else {
       GetOutput().clear();
-      return false;
+      success_flag = 0;
     }
   }
 
-  return true;
+  MPI_Bcast(&success_flag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  return success_flag == 1;
 }
 
 bool MelnikIMatrixMultRibbonMPI::RunSequential() {
