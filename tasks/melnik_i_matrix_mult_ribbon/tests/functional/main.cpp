@@ -34,90 +34,19 @@ class MelnikIMatrixMultRibbonRunFuncTestsProcesses : public ppc::util::BaseRunFu
 
   bool CheckTestOutputData(OutType &output_data) final {
     if (output_data.size() != expected_.size()) {
-      std::cerr << "\n=== DEBUG OUTPUT ===\n";
-      std::cerr << "Size mismatch: output=" << output_data.size() << ", expected=" << expected_.size() << "\n";
-      std::cerr << "Output matrix:\n";
-      for (size_t i = 0; i < output_data.size(); i++) {
-        std::cerr << "  [";
-        for (size_t j = 0; j < output_data[i].size(); j++) {
-          std::cerr << output_data[i][j];
-          if (j < output_data[i].size() - 1) {
-            std::cerr << ", ";
-          }
-        }
-        std::cerr << "]\n";
-      }
-      std::cerr << "Expected matrix:\n";
-      for (size_t i = 0; i < expected_.size(); i++) {
-        std::cerr << "  [";
-        for (size_t j = 0; j < expected_[i].size(); j++) {
-          std::cerr << expected_[i][j];
-          if (j < expected_[i].size() - 1) {
-            std::cerr << ", ";
-          }
-        }
-        std::cerr << "]\n";
-      }
-      std::cerr << "===================\n";
       return false;
     }
     if (!output_data.empty() && output_data[0].size() != expected_[0].size()) {
-      std::cerr << "\n=== DEBUG OUTPUT ===\n";
-      std::cerr << "Column size mismatch: output[0]=" << output_data[0].size()
-                << ", expected[0]=" << expected_[0].size() << "\n";
-      std::cerr << "===================\n";
       return false;
     }
 
-    const double tolerance = 1e-10;
-    bool has_mismatch = false;
-    size_t mismatch_row = 0;
-    size_t mismatch_col = 0;
-
+    const double epsilon = 1e-10;
     for (size_t i = 0; i < expected_.size(); i++) {
       for (size_t j = 0; j < expected_[i].size(); j++) {
-        if (std::abs(output_data[i][j] - expected_[i][j]) > tolerance) {
-          if (!has_mismatch) {
-            mismatch_row = i;
-            mismatch_col = j;
-            has_mismatch = true;
-          }
+        if (std::abs(output_data[i][j] - expected_[i][j]) > epsilon) {
+          return false;
         }
       }
-    }
-
-    if (has_mismatch) {
-      std::cerr << "\n=== DEBUG OUTPUT ===\n";
-      std::cerr << "Value mismatch at position [" << mismatch_row << "][" << mismatch_col << "]\n";
-      std::cerr << "Output value: " << output_data[mismatch_row][mismatch_col] << "\n";
-      std::cerr << "Expected value: " << expected_[mismatch_row][mismatch_col] << "\n";
-      std::cerr << "Difference: "
-                << std::abs(output_data[mismatch_row][mismatch_col] - expected_[mismatch_row][mismatch_col]) << "\n";
-      std::cerr << "Tolerance: " << tolerance << "\n";
-      std::cerr << "\nFull output matrix:\n";
-      for (size_t i = 0; i < output_data.size(); i++) {
-        std::cerr << "  [";
-        for (size_t j = 0; j < output_data[i].size(); j++) {
-          std::cerr << output_data[i][j];
-          if (j < output_data[i].size() - 1) {
-            std::cerr << ", ";
-          }
-        }
-        std::cerr << "]\n";
-      }
-      std::cerr << "\nFull expected matrix:\n";
-      for (size_t i = 0; i < expected_.size(); i++) {
-        std::cerr << "  [";
-        for (size_t j = 0; j < expected_[i].size(); j++) {
-          std::cerr << expected_[i][j];
-          if (j < expected_[i].size() - 1) {
-            std::cerr << ", ";
-          }
-        }
-        std::cerr << "]\n";
-      }
-      std::cerr << "===================\n";
-      return false;
     }
 
     return true;
@@ -139,7 +68,7 @@ TEST_P(MelnikIMatrixMultRibbonRunFuncTestsProcesses, MatrixMultTest) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 6> kTestParam = {
+const std::array<TestType, 9> kTestParam = {
     // 1: Identity * dense = dense
     std::make_tuple(1,
                     std::vector<std::vector<double>>{{1, 0, 0, 0, 0, 0},
@@ -237,7 +166,36 @@ const std::array<TestType, 6> kTestParam = {
                                                      {1, -2, 3, -4, 5, -6},
                                                      {-1, 2, -3, 4, -5, 6},
                                                      {1, -2, 3, -4, 5, -6},
-                                                     {-1, 2, -3, 4, -5, 6}})};
+                                                     {-1, 2, -3, 4, -5, 6}}),
+
+    // 7: Large magnitude diagonal with negatives
+    std::make_tuple(7,
+                    std::vector<std::vector<double>>{{1000, 0, 0, 0, 0, 0},
+                                                     {0, 2000, 0, 0, 0, 0},
+                                                     {0, 0, 3000, 0, 0, 0},
+                                                     {0, 0, 0, 4000, 0, 0},
+                                                     {0, 0, 0, 0, 5000, 0},
+                                                     {0, 0, 0, 0, 0, 6000}},
+                    std::vector<std::vector<double>>{{-1, 0, 0, 0, 0, 0},
+                                                     {0, -2, 0, 0, 0, 0},
+                                                     {0, 0, -3, 0, 0, 0},
+                                                     {0, 0, 0, -4, 0, 0},
+                                                     {0, 0, 0, 0, -5, 0},
+                                                     {0, 0, 0, 0, 0, -6}},
+                    std::vector<std::vector<double>>{{-1000, 0, 0, 0, 0, 0},
+                                                     {0, -4000, 0, 0, 0, 0},
+                                                     {0, 0, -9000, 0, 0, 0},
+                                                     {0, 0, 0, -16000, 0, 0},
+                                                     {0, 0, 0, 0, -25000, 0},
+                                                     {0, 0, 0, 0, 0, -36000}}),
+
+    // 8: Row vector 1x3 times 3x1 -> 1x1
+    std::make_tuple(8, std::vector<std::vector<double>>{{1.0, 2.0, 3.0}},
+                    std::vector<std::vector<double>>{{4.0}, {5.0}, {6.0}}, std::vector<std::vector<double>>{{32.0}}),
+
+    // 9: Single element 1x1 multiplication
+    std::make_tuple(9, std::vector<std::vector<double>>{{7.0}}, std::vector<std::vector<double>>{{3.0}},
+                    std::vector<std::vector<double>>{{21.0}})};
 
 const auto kTestTasksList = std::tuple_cat(
     ppc::util::AddFuncTask<MelnikIMatrixMultRibbonMPI, InType>(kTestParam, PPC_SETTINGS_melnik_i_matrix_mult_ribbon),
