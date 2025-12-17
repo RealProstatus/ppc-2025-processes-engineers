@@ -45,16 +45,12 @@ TEST_P(MelnikIMatrixMultRibbonRunPerfTestProcesses, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-namespace {
-
 const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, MelnikIMatrixMultRibbonMPI, MelnikIMatrixMultRibbonSEQ>(
     PPC_SETTINGS_melnik_i_matrix_mult_ribbon);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 
 const auto kPerfTestName = MelnikIMatrixMultRibbonRunPerfTestProcesses::CustomPerfTestName;
-
-}  // namespace
 
 INSTANTIATE_TEST_SUITE_P(RunModeTests, MelnikIMatrixMultRibbonRunPerfTestProcesses, kGtestValues, kPerfTestName);
 
