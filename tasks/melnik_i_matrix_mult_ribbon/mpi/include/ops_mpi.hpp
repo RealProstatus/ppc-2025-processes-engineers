@@ -21,14 +21,15 @@ class MelnikIMatrixMultRibbonMPI : public BaseTask {
   bool RunImpl() override;
   bool PostProcessingImpl() override;
 
+  bool RunSequential();
   void BroadcastMatrixB(std::vector<double> &b_flat, int rows_b, int cols_b);
   void ScatterMatrixA(std::vector<int> &counts, std::vector<int> &displs, std::vector<double> &local_a_flat,
                       int &local_rows, int rows_a, int cols_a, int world_size);
   static void ComputeLocalMultiplication(const std::vector<double> &local_a_flat, const std::vector<double> &b_flat,
                                          std::vector<double> &local_c_flat, int local_rows, int cols_a, int cols_b);
   void GatherMatrixC(std::vector<double> &final_result_flat, const std::vector<int> &counts,
-                     const std::vector<int> &displs, const std::vector<double> &local_c_flat, int local_rows,
-                     int rows_a, int cols_b, int world_size);
+                     const std::vector<int> &displs, const std::vector<double> &local_c_flat, int rows_a, int cols_b,
+                     int world_size);
   void ConvertToMatrix(const std::vector<double> &final_result_flat, int rows_a, int cols_b);
 
   std::vector<std::vector<double>> matrix_A_;
