@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <functional>
@@ -64,9 +65,9 @@ bool MelnikIMatrixMultRibbonMPI::PreProcessingImpl() {
     }
 
     flat_b_transposed_.assign(cols_b_ * cols_a_, 0.0);
-    for (std::size_t r = 0; r < cols_a_; ++r) {
-      for (std::size_t c = 0; c < cols_b_; ++c) {
-        flat_b_transposed_[(c * cols_a_) + r] = matrix_b[r][c];
+    for (std::size_t row_idx = 0; row_idx < cols_a_; ++row_idx) {
+      for (std::size_t col_idx = 0; col_idx < cols_b_; ++col_idx) {
+        flat_b_transposed_[(col_idx * cols_a_) + row_idx] = matrix_b[row_idx][col_idx];
       }
     }
   }
@@ -146,12 +147,8 @@ bool MelnikIMatrixMultRibbonMPI::ValidateOnRoot() {
 
 bool MelnikIMatrixMultRibbonMPI::HasUniformRowWidth(const std::vector<std::vector<double>> &matrix,
                                                     std::size_t expected_width) {
-  for (const auto &row : matrix) {
-    if (row.size() != expected_width) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(matrix.begin(), matrix.end(),
+                     [expected_width](const std::vector<double> &row) { return row.size() == expected_width; });
 }
 
 void MelnikIMatrixMultRibbonMPI::ShareSizes() {
@@ -198,13 +195,13 @@ std::size_t MelnikIMatrixMultRibbonMPI::ScatterRows(std::vector<double> &local_a
 }
 
 void MelnikIMatrixMultRibbonMPI::MultiplyLocal(const std::vector<double> &local_a, std::vector<double> &local_c) const {
-  using diff_t = std::ptrdiff_t;
-  for (std::size_t r = 0; r < local_c.size() / cols_b_; ++r) {
-    const auto a_begin = local_a.begin() + static_cast<diff_t>(r * cols_a_);
-    const auto a_end = a_begin + static_cast<diff_t>(cols_a_);
-    for (std::size_t c = 0; c < cols_b_; ++c) {
-      const auto b_begin = flat_b_transposed_.begin() + static_cast<diff_t>(c * cols_a_);
-      local_c[(r * cols_b_) + c] =
+  using DiffT = std::ptrdiff_t;
+  for (std::size_t row_idx = 0; row_idx < local_c.size() / cols_b_; ++row_idx) {
+    const auto a_begin = local_a.begin() + static_cast<DiffT>(row_idx * cols_a_);
+    const auto a_end = a_begin + static_cast<DiffT>(cols_a_);
+    for (std::size_t col_idx = 0; col_idx < cols_b_; ++col_idx) {
+      const auto b_begin = flat_b_transposed_.begin() + static_cast<DiffT>(col_idx * cols_a_);
+      local_c[(row_idx * cols_b_) + col_idx] =
           std::transform_reduce(a_begin, a_end, b_begin, 0.0, std::plus<>(), std::multiplies<>());
     }
   }

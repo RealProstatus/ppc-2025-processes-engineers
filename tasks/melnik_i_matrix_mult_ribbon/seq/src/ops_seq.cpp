@@ -1,7 +1,6 @@
 #include "melnik_i_matrix_mult_ribbon/seq/include/ops_seq.hpp"
 
 #include <cstddef>
-#include <utility>
 #include <vector>
 
 #include "melnik_i_matrix_mult_ribbon/common/include/common.hpp"
