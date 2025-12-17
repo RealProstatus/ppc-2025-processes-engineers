@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <functional>
 #include <numeric>
+#include <ranges>
 #include <vector>
 
 #include "melnik_i_matrix_mult_ribbon/common/include/common.hpp"
@@ -147,8 +148,8 @@ bool MelnikIMatrixMultRibbonMPI::ValidateOnRoot() {
 
 bool MelnikIMatrixMultRibbonMPI::HasUniformRowWidth(const std::vector<std::vector<double>> &matrix,
                                                     std::size_t expected_width) {
-  return std::all_of(matrix.begin(), matrix.end(),
-                     [expected_width](const std::vector<double> &row) { return row.size() == expected_width; });
+  return std::ranges::all_of(matrix,
+                             [expected_width](const std::vector<double> &row) { return row.size() == expected_width; });
 }
 
 void MelnikIMatrixMultRibbonMPI::ShareSizes() {
