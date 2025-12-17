@@ -30,11 +30,43 @@ bool MelnikIMatrixMultRibbonMPI::ValidationImpl() {
   int rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  bool is_valid = true;
   if (rank == 0) {
     rows_a_ = static_cast<int>(matrix_A_.size());
-    cols_a_ = (rows_a_ > 0 && !matrix_A_[0].empty()) ? static_cast<int>(matrix_A_[0].size()) : 0;
     rows_b_ = static_cast<int>(matrix_B_.size());
-    cols_b_ = (rows_b_ > 0 && !matrix_B_[0].empty()) ? static_cast<int>(matrix_B_[0].size()) : 0;
+
+    cols_a_ = (rows_a_ > 0 && !matrix_A_.empty() && !matrix_A_.front().empty())
+                  ? static_cast<int>(matrix_A_.front().size())
+                  : 0;
+    cols_b_ = (rows_b_ > 0 && !matrix_B_.empty() && !matrix_B_.front().empty())
+                  ? static_cast<int>(matrix_B_.front().size())
+                  : 0;
+
+    if (rows_a_ <= 0 || rows_b_ <= 0 || cols_a_ <= 0 || cols_b_ <= 0 || cols_a_ != rows_b_) {
+      is_valid = false;
+    } else {
+      for (const auto &row : matrix_A_) {
+        if (static_cast<int>(row.size()) != cols_a_) {
+          is_valid = false;
+          break;
+        }
+      }
+      if (is_valid) {
+        for (const auto &row : matrix_B_) {
+          if (static_cast<int>(row.size()) != cols_b_) {
+            is_valid = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  int valid_flag = is_valid ? 1 : 0;
+  MPI_Bcast(&valid_flag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  if (valid_flag == 0) {
+    rows_a_ = cols_a_ = rows_b_ = cols_b_ = 0;
+    return false;
   }
 
   std::array<int, 4> sizes = {rows_a_, cols_a_, rows_b_, cols_b_};
@@ -45,7 +77,7 @@ bool MelnikIMatrixMultRibbonMPI::ValidationImpl() {
   rows_b_ = sizes[2];
   cols_b_ = sizes[3];
 
-  return !(rows_a_ == 0 || rows_b_ == 0 || cols_a_ == 0 || cols_b_ == 0) && cols_a_ == rows_b_;
+  return true;
 }
 
 bool MelnikIMatrixMultRibbonMPI::PreProcessingImpl() {
@@ -58,6 +90,10 @@ bool MelnikIMatrixMultRibbonMPI::RunImpl() {
   int world_size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  if (rows_a_ == 0 || cols_a_ == 0 || cols_b_ == 0) {
+    return false;
+  }
 
   if (world_size == 1) {
     return RunSequential();
