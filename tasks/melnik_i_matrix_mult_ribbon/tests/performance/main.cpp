@@ -17,7 +17,7 @@ class MelnikIMatrixMultRibbonRunPerfTestProcesses : public ppc::util::BaseRunPer
   static constexpr size_t kSize = 1024;
 
  protected:
-  void GenerateMatrix(std::vector<std::vector<double>> &matrix, unsigned int seed) {
+  void static GenerateMatrix(std::vector<std::vector<double>> &matrix, unsigned int seed) {
     std::mt19937 generator(seed);
     std::uniform_real_distribution<double> distribution(-1000.0, 1000.0);
 
