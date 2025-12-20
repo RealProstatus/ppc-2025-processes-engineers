@@ -66,7 +66,7 @@ TEST_P(MelnikIMatrixMultRibbonRunFuncTestsProcesses, MatrixMultTest) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 9> kTestParam = {
+const std::array<TestType, 11> kTestParam = {
     // 1: Identity * dense = dense
     std::make_tuple(1,
                     std::vector<std::vector<double>>{{1, 0, 0, 0, 0, 0},
@@ -193,7 +193,30 @@ const std::array<TestType, 9> kTestParam = {
 
     // 9: Single element 1x1 multiplication
     std::make_tuple(9, std::vector<std::vector<double>>{{7.0}}, std::vector<std::vector<double>>{{3.0}},
-                    std::vector<std::vector<double>>{{21.0}})};
+                    std::vector<std::vector<double>>{{21.0}}),
+
+    // 10: 5x6 * 6x7 matrix multiplication
+    std::make_tuple(
+        10,
+        std::vector<std::vector<double>>{
+            {1, 2, 3, 4, 5, 6}, {2, 3, 4, 5, 6, 7}, {3, 4, 5, 6, 7, 8}, {4, 5, 6, 7, 8, 9}, {5, 6, 7, 8, 9, 10}},
+        std::vector<std::vector<double>>{{1, 2, 3, 4, 5, 6, 7},
+                                         {2, 3, 4, 5, 6, 7, 8},
+                                         {3, 4, 5, 6, 7, 8, 9},
+                                         {4, 5, 6, 7, 8, 9, 10},
+                                         {5, 6, 7, 8, 9, 10, 11},
+                                         {6, 7, 8, 9, 10, 11, 12}},
+        std::vector<std::vector<double>>{{91, 112, 133, 154, 175, 196, 217},
+                                         {112, 140, 168, 196, 224, 252, 280},
+                                         {133, 168, 203, 238, 273, 308, 343},
+                                         {154, 196, 238, 280, 322, 364, 406},
+                                         {175, 224, 273, 322, 371, 420, 469}}),
+
+    // 11: 5x4 * 4x3 matrix multiplication
+    std::make_tuple(
+        11, std::vector<std::vector<double>>{{1, 2, 3, 4}, {2, 3, 4, 5}, {3, 4, 5, 6}, {4, 5, 6, 7}, {5, 6, 7, 8}},
+        std::vector<std::vector<double>>{{1, 2, 3}, {2, 3, 4}, {3, 4, 5}, {4, 5, 6}},
+        std::vector<std::vector<double>>{{30, 40, 50}, {40, 55, 70}, {50, 70, 90}, {60, 85, 110}, {70, 100, 130}})};
 
 const auto kTestTasksList = std::tuple_cat(
     ppc::util::AddFuncTask<MelnikIMatrixMultRibbonMPI, InType>(kTestParam, PPC_SETTINGS_melnik_i_matrix_mult_ribbon),

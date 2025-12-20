@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <random>
 #include <tuple>
 #include <vector>
 
@@ -13,19 +14,29 @@ namespace melnik_i_matrix_mult_ribbon {
 
 class MelnikIMatrixMultRibbonRunPerfTestProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
  public:
-  static constexpr size_t kSize = 800;
+  static constexpr size_t kSize = 1024;
 
  protected:
+  void GenerateMatrix(std::vector<std::vector<double>> &matrix, unsigned int seed) {
+    std::mt19937 generator(seed);
+    std::uniform_real_distribution<double> distribution(-1000.0, 1000.0);
+
+    for (size_t i = 0; i < kSize; ++i) {
+      for (size_t j = 0; j < kSize; ++j) {
+        matrix[i][j] = distribution(generator);
+      }
+    }
+  }
+
   void SetUp() override {
     matrix_a_ = std::vector<std::vector<double>>(kSize, std::vector<double>(kSize));
     matrix_b_ = std::vector<std::vector<double>>(kSize, std::vector<double>(kSize));
 
-    for (size_t i = 0; i < kSize; ++i) {
-      for (size_t j = 0; j < kSize; ++j) {
-        matrix_a_[i][j] = static_cast<double>((i * kSize) + j) * 0.001;
-        matrix_b_[i][j] = static_cast<double>(i + j) * 0.002;
-      }
-    }
+    const unsigned int seed_a = 3301;
+    const unsigned int seed_b = 3307;
+
+    GenerateMatrix(matrix_a_, seed_a);
+    GenerateMatrix(matrix_b_, seed_b);
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
