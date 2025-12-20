@@ -22,4 +22,3 @@ class MelnikIGaussBlockPartSEQ : public BaseTask {
 };
 
 }  // namespace melnik_i_gauss_block_part
-

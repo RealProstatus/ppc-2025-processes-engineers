@@ -44,7 +44,9 @@ bool MelnikIGaussBlockPartSEQ::RunImpl() {
   return true;
 }
 
-bool MelnikIGaussBlockPartSEQ::PostProcessingImpl() { return true; }
+bool MelnikIGaussBlockPartSEQ::PostProcessingImpl() {
+  return true;
+}
 
 void MelnikIGaussBlockPartSEQ::ApplyGaussian(const InType &input, OutType &output) {
   static constexpr std::array<int, 9> kKernel = {1, 2, 1, 2, 4, 2, 1, 2, 1};
@@ -60,7 +62,7 @@ void MelnikIGaussBlockPartSEQ::ApplyGaussian(const InType &input, OutType &outpu
 
   auto idx = [channels, width](int y, int x, int c) {
     return (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) *
-           static_cast<std::size_t>(channels) +
+               static_cast<std::size_t>(channels) +
            static_cast<std::size_t>(c);
   };
 
@@ -83,4 +85,3 @@ void MelnikIGaussBlockPartSEQ::ApplyGaussian(const InType &input, OutType &outpu
 }
 
 }  // namespace melnik_i_gauss_block_part
-

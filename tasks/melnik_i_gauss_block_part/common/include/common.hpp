@@ -34,4 +34,3 @@ using TestType = std::tuple<Image, std::string>;
 using BaseTask = ppc::task::Task<InType, OutType>;
 
 }  // namespace melnik_i_gauss_block_part
-
