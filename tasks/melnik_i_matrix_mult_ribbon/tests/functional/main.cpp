@@ -66,7 +66,7 @@ TEST_P(MelnikIMatrixMultRibbonRunFuncTestsProcesses, MatrixMultTest) {
   ExecuteTest(GetParam());
 }
 
-const std::array<TestType, 11> kTestParam = {
+const std::array<TestType, 9> kTestParam = {
     // 1: Identity * dense = dense
     std::make_tuple(1,
                     std::vector<std::vector<double>>{{1, 0, 0, 0, 0, 0},
