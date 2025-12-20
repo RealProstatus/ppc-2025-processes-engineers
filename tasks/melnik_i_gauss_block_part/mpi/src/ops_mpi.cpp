@@ -124,7 +124,7 @@ void MelnikIGaussBlockPartMPI::DistributeImage(const InType &img, const std::vec
       const auto &dst_block = blocks[dest];
       if (dst_block.Empty()) {
         MPI_Request req{};
-        MPI_Isend(nullptr, 0, MPI_UINT8_T, dest, 0, MPI_COMM_WORLD, &req);
+        MPI_Isend(nullptr, 0, MPI_UNSIGNED_CHAR, dest, 0, MPI_COMM_WORLD, &req);
         requests.push_back(req);
         continue;
       }
@@ -133,7 +133,7 @@ void MelnikIGaussBlockPartMPI::DistributeImage(const InType &img, const std::vec
       const int sizes[2] = {img.height, img.width * channels};
       const int subsizes[2] = {dst_block.height, dst_block.width * channels};
       const int starts[2] = {dst_block.start_y, dst_block.start_x * channels};
-      MPI_Type_create_subarray(2, sizes, subsizes, starts, MPI_ORDER_C, MPI_UINT8_T, &block_type);
+      MPI_Type_create_subarray(2, sizes, subsizes, starts, MPI_ORDER_C, MPI_UNSIGNED_CHAR, &block_type);
       MPI_Type_commit(&block_type);
 
       MPI_Request req{};
@@ -147,7 +147,7 @@ void MelnikIGaussBlockPartMPI::DistributeImage(const InType &img, const std::vec
     }
   } else {
     std::uint8_t *recv_ptr = local_size > 0 ? local_data.data() : nullptr;
-    MPI_Recv(recv_ptr, std::max(local_size, 0), MPI_UINT8_T, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(recv_ptr, std::max(local_size, 0), MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 }
 
@@ -156,13 +156,13 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
                                              const std::vector<std::uint8_t> &local_data,
                                              std::vector<std::uint8_t> &extended_block) const {
   (void)grid_rows;  // Grid rows are encoded in rank/grid_cols math
+  if (block.Empty()) {
+    extended_block.clear();
+    return;
+  }
   const int ext_w = block.width + 2;
   const int ext_h = block.height + 2;
   extended_block.assign(static_cast<std::size_t>(ext_w * ext_h * channels), 0);
-
-  if (block.Empty()) {
-    return;
-  }
 
   // Copy interior
   for (int y = 0; y < block.height; ++y) {
@@ -221,12 +221,12 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
     const std::uint8_t *bottom_row =
         local_data.data() + (static_cast<std::size_t>(block.height - 1) * block.width * channels);
 
-    MPI_Sendrecv(top_row, row_count, MPI_UINT8_T, up, 0,
-                 extended_block.data() + LocalIndex(block.height + 1, 1, 0, ext_w, channels), row_count, MPI_UINT8_T,
-                 down, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(top_row, row_count, MPI_UNSIGNED_CHAR, up, 0,
+                 extended_block.data() + LocalIndex(block.height + 1, 1, 0, ext_w, channels), row_count,
+                 MPI_UNSIGNED_CHAR, down, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    MPI_Sendrecv(bottom_row, row_count, MPI_UINT8_T, down, 1,
-                 extended_block.data() + LocalIndex(0, 1, 0, ext_w, channels), row_count, MPI_UINT8_T, up, 1,
+    MPI_Sendrecv(bottom_row, row_count, MPI_UNSIGNED_CHAR, down, 1,
+                 extended_block.data() + LocalIndex(0, 1, 0, ext_w, channels), row_count, MPI_UNSIGNED_CHAR, up, 1,
                  MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 
@@ -247,11 +247,11 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
     std::vector<std::uint8_t> recv_left(static_cast<std::size_t>(col_count), 0);
     std::vector<std::uint8_t> recv_right(static_cast<std::size_t>(col_count), 0);
 
-    MPI_Sendrecv(left_col.data(), col_count, MPI_UINT8_T, left, 2, recv_right.data(), col_count, MPI_UINT8_T, right, 2,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(left_col.data(), col_count, MPI_UNSIGNED_CHAR, left, 2, recv_right.data(), col_count,
+                 MPI_UNSIGNED_CHAR, right, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    MPI_Sendrecv(right_col.data(), col_count, MPI_UINT8_T, right, 3, recv_left.data(), col_count, MPI_UINT8_T, left, 3,
-                 MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(right_col.data(), col_count, MPI_UNSIGNED_CHAR, right, 3, recv_left.data(), col_count,
+                 MPI_UNSIGNED_CHAR, left, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     if (right != MPI_PROC_NULL) {
       for (int y = 0; y < block.height; ++y) {
@@ -284,8 +284,8 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
 
   if (block.width > 0 && block.height > 0) {
     load_corner(block.height - 1, block.width - 1);
-    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UINT8_T, down_right, 4, corner_recv.data(), channels, MPI_UINT8_T,
-                 up_left, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UNSIGNED_CHAR, down_right, 4, corner_recv.data(), channels,
+                 MPI_UNSIGNED_CHAR, up_left, 4, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     if (up_left != MPI_PROC_NULL) {
       for (int c = 0; c < channels; ++c) {
         extended_block[LocalIndex(0, 0, c, ext_w, channels)] = corner_recv[static_cast<std::size_t>(c)];
@@ -293,8 +293,8 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
     }
 
     load_corner(block.height - 1, 0);
-    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UINT8_T, down_left, 5, corner_recv.data(), channels, MPI_UINT8_T,
-                 up_right, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UNSIGNED_CHAR, down_left, 5, corner_recv.data(), channels,
+                 MPI_UNSIGNED_CHAR, up_right, 5, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     if (up_right != MPI_PROC_NULL) {
       for (int c = 0; c < channels; ++c) {
         extended_block[LocalIndex(0, block.width + 1, c, ext_w, channels)] = corner_recv[static_cast<std::size_t>(c)];
@@ -302,8 +302,8 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
     }
 
     load_corner(0, block.width - 1);
-    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UINT8_T, up_right, 6, corner_recv.data(), channels, MPI_UINT8_T,
-                 down_left, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UNSIGNED_CHAR, up_right, 6, corner_recv.data(), channels,
+                 MPI_UNSIGNED_CHAR, down_left, 6, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     if (down_left != MPI_PROC_NULL) {
       for (int c = 0; c < channels; ++c) {
         extended_block[LocalIndex(block.height + 1, 0, c, ext_w, channels)] = corner_recv[static_cast<std::size_t>(c)];
@@ -311,8 +311,8 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &block, int grid_ro
     }
 
     load_corner(0, 0);
-    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UINT8_T, up_left, 7, corner_recv.data(), channels, MPI_UINT8_T,
-                 down_right, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Sendrecv(corner_buffer.data(), channels, MPI_UNSIGNED_CHAR, up_left, 7, corner_recv.data(), channels,
+                 MPI_UNSIGNED_CHAR, down_right, 7, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     if (down_right != MPI_PROC_NULL) {
       for (int c = 0; c < channels; ++c) {
         extended_block[LocalIndex(block.height + 1, block.width + 1, c, ext_w, channels)] =
@@ -444,6 +444,13 @@ bool MelnikIGaussBlockPartMPI::RunImpl() {
 
   std::vector<std::uint8_t> local_data;
   DistributeImage(GetInput(), blocks, local_data, rank, comm_size, channels);
+
+  if (blocks[static_cast<std::size_t>(rank)].Empty()) {
+    std::vector<std::uint8_t> local_output;
+    std::vector<std::uint8_t> extended_block;
+    GatherResult(blocks, channels, width, height, local_output, GetOutput(), rank, comm_size);
+    return true;
+  }
 
   std::vector<std::uint8_t> extended_block;
   ExchangeHalos(blocks[static_cast<std::size_t>(rank)], grid_rows, grid_cols, rank, channels, width, height, local_data,
