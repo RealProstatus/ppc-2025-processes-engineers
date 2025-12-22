@@ -21,7 +21,7 @@ class MelnikIGaussBlockPartSEQ : public BaseTask {
   bool RunImpl() override;
   bool PostProcessingImpl() override;
 
-  static int GetPixelClamped(const std::vector<int> &data, int width, int height, int x, int y);
+  static std::uint8_t GetPixelClamped(const std::vector<std::uint8_t> &data, int width, int height, int x, int y);
 };
 
 }  // namespace melnik_i_gauss_block_part

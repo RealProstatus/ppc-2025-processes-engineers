@@ -50,7 +50,7 @@ OutType ApplyGaussianReference(const InType &input) {
           accum += kKernel[(ky + 1) * 3 + (kx + 1)] * data[idx(yy, xx)];
         }
       }
-      output[idx(y, x)] = (accum + kKernelSum / 2) / kKernelSum;
+      output[idx(y, x)] = static_cast<std::uint8_t>((accum + kKernelSum / 2) / kKernelSum);
     }
   }
 
@@ -90,16 +90,17 @@ class MelnikIGaussBlockPartFuncTests : public ppc::util::BaseRunFuncTests<InType
 
 namespace {
 
-InType MakeImage(int width, int height, const std::vector<int> &data) {
+InType MakeImage(int width, int height, const std::vector<std::uint8_t> &data) {
   return {data, width, height};
 }
 
 InType MakeRamp(int width, int height, int base = 0) {
-  std::vector<int> data(static_cast<std::size_t>(width * height));
+  std::vector<std::uint8_t> data(static_cast<std::size_t>(width * height));
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
+      const int v = base + y * 17 + x * 3;
       data[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
-          base + y * 100 + x;
+          static_cast<std::uint8_t>(v & 0xFF);
     }
   }
   return {data, width, height};
@@ -113,7 +114,7 @@ const std::array<TestType, 4> kTestParam = {
     std::make_tuple(MakeRamp(6, 3, 10), "divisible_p2_6x3"),
     // For P=4, 8x4 divides cleanly for both 1x4 and 2x2 factorizations.
     std::make_tuple(MakeRamp(8, 4, 20), "divisible_p4_8x4"),
-    std::make_tuple(MakeImage(3, 3, std::vector<int>{10, 20, 30, 40, 50, 60, 70, 80, 90}), "tiny_3x3"),
+    std::make_tuple(MakeImage(3, 3, std::vector<std::uint8_t>{10, 20, 30, 40, 50, 60, 70, 80, 90}), "tiny_3x3"),
 };
 
 // Extra rectangular / "not so nice" cases: non-square, non-uniform sizes.

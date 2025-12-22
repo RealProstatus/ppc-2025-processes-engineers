@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <stb/stb_image.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -41,7 +42,7 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
     const int rank = ppc::util::GetMPIRank();
     if (rank != 0) {
       // Only rank 0 owns full input data (per task requirements).
-      input_ = {std::vector<int>{}, 0, 0};
+      input_ = {std::vector<std::uint8_t>{}, 0, 0};
       return;
     }
     input_path_ = ppc::util::GetAbsoluteTaskPath(PPC_ID_melnik_i_gauss_block_part, "verybig.jpg");
@@ -66,10 +67,8 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
       throw std::runtime_error("Loaded image has zero size: " + input_path_);
     }
 
-    std::vector<int> data(sz);
-    for (std::size_t i = 0; i < sz; ++i) {
-      data[i] = static_cast<int>(raw[i]);
-    }
+    std::vector<std::uint8_t> data(sz);
+    std::copy(raw, raw + sz, data.begin());
     stbi_image_free(raw);
 
     input_ = {data, width, height};

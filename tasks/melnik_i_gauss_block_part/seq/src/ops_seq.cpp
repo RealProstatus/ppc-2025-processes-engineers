@@ -68,7 +68,8 @@ bool MelnikIGaussBlockPartSEQ::PostProcessingImpl() {
   return true;
 }
 
-int MelnikIGaussBlockPartSEQ::GetPixelClamped(const std::vector<int> &data, int width, int height, int x, int y) {
+std::uint8_t MelnikIGaussBlockPartSEQ::GetPixelClamped(const std::vector<std::uint8_t> &data, int width, int height,
+                                                       int x, int y) {
   const int xx = ClampInt(x, 0, width - 1);
   const int yy = ClampInt(y, 0, height - 1);
   return data[static_cast<std::size_t>(yy) * static_cast<std::size_t>(width) + static_cast<std::size_t>(xx)];
