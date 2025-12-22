@@ -234,8 +234,8 @@ bool MelnikIGaussBlockPartMPI::PreProcessingImpl() {
   return true;
 }
 
-int MelnikIGaussBlockPartMPI::ClampInt(int v, int lo, int hi) {
-  return std::max(lo, std::min(v, hi));
+int MelnikIGaussBlockPartMPI::ClampInt(int v, int low, int high) {
+  return std::max(low, std::min(v, high));
 }
 
 std::pair<int, int> MelnikIGaussBlockPartMPI::ComputeProcessGrid(int comm_size, int width, int height) {
@@ -402,6 +402,27 @@ std::vector<MelnikIGaussBlockPartMPI::BlockInfo> MelnikIGaussBlockPartMPI::Build
   return blocks;
 }
 
+void MelnikIGaussBlockPartMPI::SendBlocksToOthers(int comm_size, int width, int height,
+                                                  const std::vector<BlockInfo> &blocks,
+                                                  const std::vector<std::uint8_t> &root_data) {
+  for (int dest = 1; dest < comm_size; ++dest) {
+    const auto &blk = blocks[static_cast<std::size_t>(dest)];
+    if (blk.Empty()) {
+      MPI_Send(nullptr, 0, MPI_BYTE, dest, 0, MPI_COMM_WORLD);
+      continue;
+    }
+
+    MPI_Datatype sub{};
+    const std::array<int, 2> sizes = {height, width};
+    const std::array<int, 2> subs = {blk.height, blk.width};
+    const std::array<int, 2> starts = {blk.start_y, blk.start_x};
+    MPI_Type_create_subarray(2, sizes.data(), subs.data(), starts.data(), MPI_ORDER_C, MPI_BYTE, &sub);
+    MPI_Type_commit(&sub);
+    MPI_Send(root_data.data(), 1, sub, dest, 0, MPI_COMM_WORLD);
+    MPI_Type_free(&sub);
+  }
+}
+
 std::vector<std::uint8_t> MelnikIGaussBlockPartMPI::ScatterBlock(int rank, int comm_size, int width, int height,
                                                                  const std::vector<BlockInfo> &blocks,
                                                                  const BlockInfo &my_blk,
@@ -424,27 +445,14 @@ std::vector<std::uint8_t> MelnikIGaussBlockPartMPI::ScatterBlock(int rank, int c
             local_data.begin() + static_cast<std::ptrdiff_t>(dst_off));
       }
     }
-
-    for (int dest = 1; dest < comm_size; ++dest) {
-      const auto &blk = blocks[static_cast<std::size_t>(dest)];
-      if (blk.Empty()) {
-        MPI_Send(nullptr, 0, MPI_BYTE, dest, 0, MPI_COMM_WORLD);
-        continue;
-      }
-
-      MPI_Datatype sub{};
-      const std::array<int, 2> sizes = {height, width};
-      const std::array<int, 2> subs = {blk.height, blk.width};
-      const std::array<int, 2> starts = {blk.start_y, blk.start_x};
-      MPI_Type_create_subarray(2, sizes.data(), subs.data(), starts.data(), MPI_ORDER_C, MPI_BYTE, &sub);
-      MPI_Type_commit(&sub);
-      MPI_Send(root_data.data(), 1, sub, dest, 0, MPI_COMM_WORLD);
-      MPI_Type_free(&sub);
-    }
+    SendBlocksToOthers(comm_size, width, height, blocks, root_data);
   } else {
-    const int recv_count = my_blk.Empty() ? 0 : (my_blk.width * my_blk.height);
-    std::uint8_t *recv_ptr = recv_count > 0 ? local_data.data() : nullptr;
-    MPI_Recv(recv_ptr, recv_count, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    if (!my_blk.Empty()) {
+      const int recv_count = my_blk.width * my_blk.height;
+      MPI_Recv(local_data.data(), recv_count, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } else {
+      MPI_Recv(nullptr, 0, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
   }
 
   return local_data;

@@ -42,7 +42,7 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
   void LoadRealImage() {
     const int rank = ppc::util::GetMPIRank();
     if (rank != 0) {
-      // Only rank 0 owns full input data (per task requirements).
+      // Only rank 0 owns full input data
       input_ = {std::vector<std::uint8_t>{}, 0, 0};
       return;
     }
