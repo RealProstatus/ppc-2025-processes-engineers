@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -47,17 +48,17 @@ bool MelnikIGaussBlockPartSEQ::RunImpl() {
   auto &out = GetOutput();
   out.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
 
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
+  for (int yy = 0; yy < height; ++yy) {
+    for (int xx = 0; xx < width; ++xx) {
       int acc = 0;
       int k = 0;
       for (int dy = -1; dy <= 1; ++dy) {
         for (int dx = -1; dx <= 1; ++dx) {
-          acc += kKernel[static_cast<std::size_t>(k)] * GetPixelClamped(data, width, height, x + dx, y + dy);
+          acc += kKernel[static_cast<std::size_t>(k)] * GetPixelClamped(data, width, height, xx + dx, yy + dy);
           ++k;
         }
       }
-      out[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
+      out[static_cast<std::size_t>(yy) * static_cast<std::size_t>(width) + static_cast<std::size_t>(xx)] =
           (acc + kSum / 2) / kSum;
     }
   }

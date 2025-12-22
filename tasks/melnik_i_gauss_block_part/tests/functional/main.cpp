@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
-#include <random>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -40,17 +41,17 @@ OutType ApplyGaussianReference(const InType &input) {
 
   auto clamp = [](int value, int low, int high) { return std::max(low, std::min(value, high)); };
 
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
+  for (int wy = 0; wy < height; ++wy) {
+    for (int wx = 0; wx < width; ++wx) {
       int accum = 0;
       for (int ky = -1; ky <= 1; ++ky) {
-        const int yy = clamp(y + ky, 0, height - 1);
+        const int yy = clamp(wy + ky, 0, height - 1);
         for (int kx = -1; kx <= 1; ++kx) {
-          const int xx = clamp(x + kx, 0, width - 1);
+          const int xx = clamp(wx + kx, 0, width - 1);
           accum += kKernel[(ky + 1) * 3 + (kx + 1)] * data[idx(yy, xx)];
         }
       }
-      output[idx(y, x)] = static_cast<std::uint8_t>((accum + kKernelSum / 2) / kKernelSum);
+      output[idx(wy, wx)] = static_cast<std::uint8_t>((accum + kKernelSum / 2) / kKernelSum);
     }
   }
 
@@ -63,7 +64,7 @@ bool VectorsEqual(const OutType &lhs, const OutType &rhs) {
 
 }  // namespace
 
-class MelnikIGaussBlockPartFuncTests : public ppc::util::BaseRunFuncTests<InType, OutType, TestType> {  // NOLINT
+class MelnikIGaussBlockPartFuncTests : public ppc::util::BaseRunFuncTests<InType, OutType, TestType> {
  public:
   static std::string PrintTestParam(const TestType &test_param) {
     return std::get<1>(test_param);
@@ -96,11 +97,11 @@ InType MakeImage(int width, int height, const std::vector<std::uint8_t> &data) {
 
 InType MakeRamp(int width, int height, int base = 0) {
   std::vector<std::uint8_t> data(static_cast<std::size_t>(width * height));
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      const int v = base + y * 17 + x * 3;
-      data[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
-          static_cast<std::uint8_t>(v & 0xFF);
+  for (int yy = 0; yy < height; ++yy) {
+    for (int xx = 0; xx < width; ++xx) {
+      const int vv = base + yy * 17 + xx * 3;
+      data[static_cast<std::size_t>(yy) * static_cast<std::size_t>(width) + static_cast<std::size_t>(xx)] =
+          static_cast<std::uint8_t>(vv & 0xFF);
     }
   }
   return {data, width, height};

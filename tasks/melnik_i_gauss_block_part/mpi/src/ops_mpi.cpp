@@ -4,10 +4,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <ranges>
+#include <utility>
 #include <vector>
 
 #include "melnik_i_gauss_block_part/common/include/common.hpp"

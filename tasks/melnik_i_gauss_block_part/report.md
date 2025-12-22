@@ -92,8 +92,6 @@ K=\begin{pmatrix}
 ### 5.1. Структура реализации
 ```text
 melnik_i_gauss_block_part
-│   settings.json
-│   report.md
 │
 ├───common
 │   └───include

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "melnik_i_gauss_block_part/common/include/common.hpp"
 #include "task/include/task.hpp"

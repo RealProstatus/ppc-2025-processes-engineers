@@ -15,7 +15,7 @@
 
 namespace melnik_i_gauss_block_part {
 
-class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {  // NOLINT
+class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
  public:
   void SetUp() override {
     LoadRealImage();
@@ -74,8 +74,8 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
     input_ = {data, width, height};
   }
 
-  InType input_{};
-  std::string input_path_{};
+  InType input_;
+  std::string input_path_;
 };
 
 TEST_P(MelnikIGaussBlockPartPerfTests, RunPerfModes) {
