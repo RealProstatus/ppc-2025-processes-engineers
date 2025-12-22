@@ -215,8 +215,8 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows
   for (int y = 0; y < blk.height; ++y) {
     send_col[static_cast<std::size_t>(y)] = ext[ExtIdx(y + 1, 1, ext_w)];
   }
-  MPI_Sendrecv(send_col.data(), blk.height, MPI_UNSIGNED_CHAR, left, 20, recv_col.data(), blk.height,
-               MPI_UNSIGNED_CHAR, left, 21, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  MPI_Sendrecv(send_col.data(), blk.height, MPI_UNSIGNED_CHAR, left, 20, recv_col.data(), blk.height, MPI_UNSIGNED_CHAR,
+               left, 21, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   if (left != MPI_PROC_NULL) {
     for (int y = 0; y < blk.height; ++y) {
       ext[ExtIdx(y + 1, 0, ext_w)] = recv_col[static_cast<std::size_t>(y)];
@@ -246,8 +246,7 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows
   // up-left: send my top-left, receive their bottom-right
   send_val = ext[ExtIdx(1, 1, ext_w)];
   MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, up_left, 30, &recv_val, 1, MPI_UNSIGNED_CHAR, up_left, 31,
-               MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
+               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   if (up_left != MPI_PROC_NULL) {
     ext[ExtIdx(0, 0, ext_w)] = recv_val;
   }
@@ -255,8 +254,7 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows
   // up-right: send my top-right, receive their bottom-left
   send_val = ext[ExtIdx(1, blk.width, ext_w)];
   MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, up_right, 32, &recv_val, 1, MPI_UNSIGNED_CHAR, up_right, 33,
-               MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
+               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   if (up_right != MPI_PROC_NULL) {
     ext[ExtIdx(0, blk.width + 1, ext_w)] = recv_val;
   }
@@ -264,8 +262,7 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows
   // down-left: send my bottom-left, receive their top-right (swap tags vs up-right)
   send_val = ext[ExtIdx(blk.height, 1, ext_w)];
   MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, down_left, 33, &recv_val, 1, MPI_UNSIGNED_CHAR, down_left, 32,
-               MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
+               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   if (down_left != MPI_PROC_NULL) {
     ext[ExtIdx(blk.height + 1, 0, ext_w)] = recv_val;
   }
@@ -273,8 +270,7 @@ void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows
   // down-right: send my bottom-right, receive their top-left (swap tags vs up-left)
   send_val = ext[ExtIdx(blk.height, blk.width, ext_w)];
   MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, down_right, 31, &recv_val, 1, MPI_UNSIGNED_CHAR, down_right, 30,
-               MPI_COMM_WORLD,
-               MPI_STATUS_IGNORE);
+               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   if (down_right != MPI_PROC_NULL) {
     ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = recv_val;
   }
