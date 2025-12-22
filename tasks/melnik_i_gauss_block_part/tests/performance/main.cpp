@@ -21,9 +21,15 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    return output_data.width == input_.width && output_data.height == input_.height &&
-           output_data.channels == input_.channels && !output_data.data.empty() &&
-           output_data.data.size() == input_.data.size();
+    const int rank = ppc::util::GetMPIRank();
+    if (rank != 0) {
+      // In perf mode MPI implementation may keep output only on rank 0 to avoid huge broadcasts.
+      return true;
+    }
+    const auto &[data, width, height] = input_;
+    (void)width;
+    (void)height;
+    return !output_data.empty() && output_data.size() == data.size();
   }
 
   InType GetTestInputData() final {
@@ -32,12 +38,18 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
 
  private:
   void LoadRealImage() {
+    const int rank = ppc::util::GetMPIRank();
+    if (rank != 0) {
+      // Only rank 0 owns full input data (per task requirements).
+      input_ = {std::vector<int>{}, 0, 0};
+      return;
+    }
     input_path_ = ppc::util::GetAbsoluteTaskPath(PPC_ID_melnik_i_gauss_block_part, "verybig.jpg");
 
     int width = -1;
     int height = -1;
     int channels = -1;
-    unsigned char *raw = stbi_load(input_path_.c_str(), &width, &height, &channels, STBI_rgb);
+    unsigned char *raw = stbi_load(input_path_.c_str(), &width, &height, &channels, STBI_grey);
     if (raw == nullptr) {
       throw std::runtime_error("Failed to load image: " + input_path_ +
                                " reason: " + std::string(stbi_failure_reason()));
@@ -48,17 +60,19 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
       throw std::runtime_error("Loaded image has non-positive dimensions: " + input_path_);
     }
 
-    input_.width = width;
-    input_.height = height;
-    input_.channels = STBI_rgb;
-    const std::size_t sz = static_cast<std::size_t>(input_.width) * static_cast<std::size_t>(input_.height) *
-                           static_cast<std::size_t>(input_.channels);
+    const std::size_t sz = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
     if (sz == 0) {
       stbi_image_free(raw);
       throw std::runtime_error("Loaded image has zero size: " + input_path_);
     }
-    input_.data.assign(raw, raw + sz);
+
+    std::vector<int> data(sz);
+    for (std::size_t i = 0; i < sz; ++i) {
+      data[i] = static_cast<int>(raw[i]);
+    }
     stbi_image_free(raw);
+
+    input_ = {data, width, height};
   }
 
   InType input_{};

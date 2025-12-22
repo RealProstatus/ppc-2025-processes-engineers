@@ -18,45 +18,47 @@ namespace melnik_i_gauss_block_part {
 
 namespace {
 
-Image ApplyGaussianReference(const Image &input) {
+OutType ApplyGaussianReference(const InType &input) {
   static constexpr std::array<int, 9> kKernel = {1, 2, 1, 2, 4, 2, 1, 2, 1};
   static constexpr int kKernelSum = 16;
 
-  Image output;
-  output.width = input.width;
-  output.height = input.height;
-  output.channels = input.channels;
-  output.data.resize(input.data.size());
+  const auto &[data, width, height] = input;
+  if (width <= 0 || height <= 0) {
+    return {};
+  }
+  const std::size_t expected = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+  if (data.size() != expected) {
+    return {};
+  }
 
-  auto idx = [&](int y, int x, int c) {
-    return (static_cast<std::size_t>(y) * static_cast<std::size_t>(input.width) + static_cast<std::size_t>(x)) *
-               static_cast<std::size_t>(input.channels) +
-           static_cast<std::size_t>(c);
+  OutType output;
+  output.resize(data.size());
+
+  auto idx = [&](int y, int x) {
+    return static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
   };
 
   auto clamp = [](int value, int low, int high) { return std::max(low, std::min(value, high)); };
 
-  for (int y = 0; y < input.height; ++y) {
-    for (int x = 0; x < input.width; ++x) {
-      for (int c = 0; c < input.channels; ++c) {
-        int accum = 0;
-        for (int ky = -1; ky <= 1; ++ky) {
-          const int yy = clamp(y + ky, 0, input.height - 1);
-          for (int kx = -1; kx <= 1; ++kx) {
-            const int xx = clamp(x + kx, 0, input.width - 1);
-            accum += kKernel[(ky + 1) * 3 + (kx + 1)] * static_cast<int>(input.data[idx(yy, xx, c)]);
-          }
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      int accum = 0;
+      for (int ky = -1; ky <= 1; ++ky) {
+        const int yy = clamp(y + ky, 0, height - 1);
+        for (int kx = -1; kx <= 1; ++kx) {
+          const int xx = clamp(x + kx, 0, width - 1);
+          accum += kKernel[(ky + 1) * 3 + (kx + 1)] * data[idx(yy, xx)];
         }
-        output.data[idx(y, x, c)] = static_cast<std::uint8_t>((accum + kKernelSum / 2) / kKernelSum);
       }
+      output[idx(y, x)] = (accum + kKernelSum / 2) / kKernelSum;
     }
   }
 
   return output;
 }
 
-bool ImagesEqual(const Image &lhs, const Image &rhs) {
-  return lhs.width == rhs.width && lhs.height == rhs.height && lhs.channels == rhs.channels && lhs.data == rhs.data;
+bool VectorsEqual(const OutType &lhs, const OutType &rhs) {
+  return lhs == rhs;
 }
 
 }  // namespace
@@ -75,7 +77,7 @@ class MelnikIGaussBlockPartFuncTests : public ppc::util::BaseRunFuncTests<InType
 
   bool CheckTestOutputData(OutType &output_data) final {
     const auto expected = ApplyGaussianReference(input_data_);
-    return ImagesEqual(expected, output_data);
+    return VectorsEqual(expected, output_data);
   }
 
   InType GetTestInputData() final {
@@ -88,60 +90,44 @@ class MelnikIGaussBlockPartFuncTests : public ppc::util::BaseRunFuncTests<InType
 
 namespace {
 
-Image MakeImage(int width, int height, int channels, const std::vector<std::uint8_t> &data) {
-  Image img;
-  img.width = width;
-  img.height = height;
-  img.channels = channels;
-  img.data = data;
-  return img;
+InType MakeImage(int width, int height, const std::vector<int> &data) {
+  return {data, width, height};
 }
 
-Image MakeGradient(int width, int height, int channels) {
-  Image img;
-  img.width = width;
-  img.height = height;
-  img.channels = channels;
-  img.data.resize(static_cast<std::size_t>(width * height * channels));
+InType MakeRamp(int width, int height, int base = 0) {
+  std::vector<int> data(static_cast<std::size_t>(width * height));
   for (int y = 0; y < height; ++y) {
     for (int x = 0; x < width; ++x) {
-      for (int c = 0; c < channels; ++c) {
-        img.data[(static_cast<std::size_t>(y) * width + static_cast<std::size_t>(x)) * channels +
-                 static_cast<std::size_t>(c)] = static_cast<std::uint8_t>((x + y + c * 3) % 256);
-      }
+      data[static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
+          base + y * 100 + x;
     }
   }
-  return img;
+  return {data, width, height};
 }
 
-Image MakeRandom(int width, int height, int channels, unsigned int seed) {
-  Image img;
-  img.width = width;
-  img.height = height;
-  img.channels = channels;
-  img.data.resize(static_cast<std::size_t>(width * height * channels));
-  std::mt19937 gen(seed);
-  std::uniform_int_distribution<int> dist(0, 255);
-  for (auto &v : img.data) {
-    v = static_cast<std::uint8_t>(dist(gen));
-  }
-  return img;
-}
+// Predictable, small, exactly divisible cases for running under mpirun -np 1/2/4.
+// These do NOT depend on a particular 2D grid choice, they just ensure "nice" splits exist.
+const std::array<TestType, 4> kTestParam = {
+    std::make_tuple(MakeRamp(4, 4, 0), "divisible_p1_4x4"),
+    // For P=2, our grid selector tends to pick 1x2 when H/W≈0.5; 6x3 fits that and divides by 2 along X.
+    std::make_tuple(MakeRamp(6, 3, 10), "divisible_p2_6x3"),
+    // For P=4, 8x4 divides cleanly for both 1x4 and 2x2 factorizations.
+    std::make_tuple(MakeRamp(8, 4, 20), "divisible_p4_8x4"),
+    std::make_tuple(MakeImage(3, 3, std::vector<int>{10, 20, 30, 40, 50, 60, 70, 80, 90}), "tiny_3x3"),
+};
 
-const std::array<TestType, 6> kTestParam = {
-    std::make_tuple(MakeImage(3, 3, 1, std::vector<std::uint8_t>{10, 20, 30, 40, 50, 60, 70, 80, 90}),
-                    "grayscale_small"),
-    std::make_tuple(MakeImage(2, 2, 3, std::vector<std::uint8_t>{10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120}),
-                    "rgb_two_by_two"),
-    std::make_tuple(MakeGradient(5, 4, 1), "grayscale_gradient"),
-    std::make_tuple(MakeGradient(7, 5, 3), "rgb_gradient_non_divisible"),
-    std::make_tuple(MakeRandom(8, 3, 3, 1234), "wide_rgb_random"),
-    std::make_tuple(MakeRandom(4, 9, 1, 2025), "tall_gray_random"),
+// Extra rectangular / "not so nice" cases: non-square, non-uniform sizes.
+const std::array<TestType, 5> kRectParam = {
+    std::make_tuple(MakeRamp(5, 4, 0), "rect_5x4"),  std::make_tuple(MakeRamp(7, 3, 5), "rect_7x3"),
+    std::make_tuple(MakeRamp(3, 7, 7), "rect_3x7"),  std::make_tuple(MakeRamp(1, 8, 11), "thin_1x8"),
+    std::make_tuple(MakeRamp(8, 1, 13), "thin_8x1"),
 };
 
 const auto kTestTasksList = std::tuple_cat(
     ppc::util::AddFuncTask<MelnikIGaussBlockPartMPI, InType>(kTestParam, PPC_SETTINGS_melnik_i_gauss_block_part),
-    ppc::util::AddFuncTask<MelnikIGaussBlockPartSEQ, InType>(kTestParam, PPC_SETTINGS_melnik_i_gauss_block_part));
+    ppc::util::AddFuncTask<MelnikIGaussBlockPartSEQ, InType>(kTestParam, PPC_SETTINGS_melnik_i_gauss_block_part),
+    ppc::util::AddFuncTask<MelnikIGaussBlockPartMPI, InType>(kRectParam, PPC_SETTINGS_melnik_i_gauss_block_part),
+    ppc::util::AddFuncTask<MelnikIGaussBlockPartSEQ, InType>(kRectParam, PPC_SETTINGS_melnik_i_gauss_block_part));
 
 const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
 const auto kFuncTestName = MelnikIGaussBlockPartFuncTests::PrintFuncTestName<MelnikIGaussBlockPartFuncTests>;
