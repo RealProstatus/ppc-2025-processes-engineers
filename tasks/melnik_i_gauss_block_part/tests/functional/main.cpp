@@ -109,18 +109,13 @@ InType MakeRamp(int width, int height, int base = 0) {
   return {data, width, height};
 }
 
-// Predictable, small, exactly divisible cases for running under mpirun -np 1/2/4.
-// These do NOT depend on a particular 2D grid choice, they just ensure "nice" splits exist.
 const std::array<TestType, 4> kTestParam = {
     std::make_tuple(MakeRamp(4, 4, 0), "divisible_p1_4x4"),
-    // For P=2, our grid selector tends to pick 1x2 when H/W≈0.5; 6x3 fits that and divides by 2 along X.
     std::make_tuple(MakeRamp(6, 3, 10), "divisible_p2_6x3"),
-    // For P=4, 8x4 divides cleanly for both 1x4 and 2x2 factorizations.
     std::make_tuple(MakeRamp(8, 4, 20), "divisible_p4_8x4"),
     std::make_tuple(MakeImage(3, 3, std::vector<std::uint8_t>{10, 20, 30, 40, 50, 60, 70, 80, 90}), "tiny_3x3"),
 };
 
-// Extra rectangular / "not so nice" cases: non-square, non-uniform sizes.
 const std::array<TestType, 5> kRectParam = {
     std::make_tuple(MakeRamp(5, 4, 0), "rect_5x4"),  std::make_tuple(MakeRamp(7, 3, 5), "rect_7x3"),
     std::make_tuple(MakeRamp(3, 7, 7), "rect_3x7"),  std::make_tuple(MakeRamp(1, 8, 11), "thin_1x8"),

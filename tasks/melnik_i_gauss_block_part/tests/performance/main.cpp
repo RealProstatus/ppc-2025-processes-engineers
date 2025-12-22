@@ -25,7 +25,7 @@ class MelnikIGaussBlockPartPerfTests : public ppc::util::BaseRunPerfTests<InType
   bool CheckTestOutputData(OutType &output_data) final {
     const int rank = ppc::util::GetMPIRank();
     if (rank != 0) {
-      // In perf mode MPI implementation may keep output only on rank 0 to avoid huge broadcasts.
+      // In perf mode MPI implementation may keep output only on rank 0 to avoid huge broadcasts
       return true;
     }
     const auto &[data, width, height] = input_;
