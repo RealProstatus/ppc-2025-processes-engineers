@@ -1,0 +1,28 @@
+#pragma once
+
+#include <cstdint>
+#include <vector>
+
+#include "melnik_i_gauss_block_part/common/include/common.hpp"
+#include "task/include/task.hpp"
+
+namespace melnik_i_gauss_block_part {
+
+class MelnikIGaussBlockPartSEQ : public BaseTask {
+ public:
+  static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
+    return ppc::task::TypeOfTask::kSEQ;
+  }
+
+  explicit MelnikIGaussBlockPartSEQ(const InType &in);
+
+ private:
+  bool ValidationImpl() override;
+  bool PreProcessingImpl() override;
+  bool RunImpl() override;
+  bool PostProcessingImpl() override;
+
+  static std::uint8_t GetPixelClamped(const std::vector<std::uint8_t> &data, int width, int height, int x, int y);
+};
+
+}  // namespace melnik_i_gauss_block_part

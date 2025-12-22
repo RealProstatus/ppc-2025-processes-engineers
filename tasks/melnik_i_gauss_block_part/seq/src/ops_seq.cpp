@@ -1,0 +1,79 @@
+#include "melnik_i_gauss_block_part/seq/include/ops_seq.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "melnik_i_gauss_block_part/common/include/common.hpp"
+
+namespace melnik_i_gauss_block_part {
+
+namespace {
+
+inline int ClampInt(int v, int lo, int hi) {
+  return std::max(lo, std::min(v, hi));
+}
+
+}  // namespace
+
+MelnikIGaussBlockPartSEQ::MelnikIGaussBlockPartSEQ(const InType &in) {
+  SetTypeOfTask(GetStaticTypeOfTask());
+  GetInput() = in;
+  GetOutput().clear();
+}
+
+bool MelnikIGaussBlockPartSEQ::ValidationImpl() {
+  const auto &[data, width, height] = GetInput();
+
+  const std::size_t expected = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+  return data.size() == expected;
+}
+
+bool MelnikIGaussBlockPartSEQ::PreProcessingImpl() {
+  const auto &[data, width, height] = GetInput();
+
+  (void)data;
+  GetOutput().assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0);
+  return true;
+}
+
+bool MelnikIGaussBlockPartSEQ::RunImpl() {
+  const auto &[data, width, height] = GetInput();
+
+  static constexpr std::array<int, 9> kKernel = {1, 2, 1, 2, 4, 2, 1, 2, 1};
+  static constexpr int kSum = 16;
+
+  auto &out = GetOutput();
+  out.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+
+  for (int yy = 0; yy < height; ++yy) {
+    for (int xx = 0; xx < width; ++xx) {
+      int acc = 0;
+      std::size_t kernel_idx = 0;
+      for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+          acc += kKernel.at(kernel_idx) * GetPixelClamped(data, width, height, xx + dx, yy + dy);
+          ++kernel_idx;
+        }
+      }
+      out[(static_cast<std::size_t>(yy) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(xx)] =
+          (acc + kSum / 2) / kSum;
+    }
+  }
+  return true;
+}
+
+bool MelnikIGaussBlockPartSEQ::PostProcessingImpl() {
+  return true;
+}
+
+std::uint8_t MelnikIGaussBlockPartSEQ::GetPixelClamped(const std::vector<std::uint8_t> &data, int width, int height,
+                                                       int x, int y) {
+  const int xx = ClampInt(x, 0, width - 1);
+  const int yy = ClampInt(y, 0, height - 1);
+  return data[(static_cast<std::size_t>(yy) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(xx)];
+}
+
+}  // namespace melnik_i_gauss_block_part
