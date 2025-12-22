@@ -51,14 +51,14 @@ bool MelnikIGaussBlockPartSEQ::RunImpl() {
   for (int yy = 0; yy < height; ++yy) {
     for (int xx = 0; xx < width; ++xx) {
       int acc = 0;
-      int k = 0;
+      std::size_t kernel_idx = 0;
       for (int dy = -1; dy <= 1; ++dy) {
         for (int dx = -1; dx <= 1; ++dx) {
-          acc += kKernel[static_cast<std::size_t>(k)] * GetPixelClamped(data, width, height, xx + dx, yy + dy);
-          ++k;
+          acc += kKernel.at(kernel_idx) * GetPixelClamped(data, width, height, xx + dx, yy + dy);
+          ++kernel_idx;
         }
       }
-      out[static_cast<std::size_t>(yy) * static_cast<std::size_t>(width) + static_cast<std::size_t>(xx)] =
+      out[(static_cast<std::size_t>(yy) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(xx)] =
           (acc + kSum / 2) / kSum;
     }
   }
@@ -73,7 +73,7 @@ std::uint8_t MelnikIGaussBlockPartSEQ::GetPixelClamped(const std::vector<std::ui
                                                        int x, int y) {
   const int xx = ClampInt(x, 0, width - 1);
   const int yy = ClampInt(y, 0, height - 1);
-  return data[static_cast<std::size_t>(yy) * static_cast<std::size_t>(width) + static_cast<std::size_t>(xx)];
+  return data[(static_cast<std::size_t>(yy) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(xx)];
 }
 
 }  // namespace melnik_i_gauss_block_part

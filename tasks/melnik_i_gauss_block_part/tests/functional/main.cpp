@@ -36,7 +36,7 @@ OutType ApplyGaussianReference(const InType &input) {
   output.resize(data.size());
 
   auto idx = [&](int y, int x) {
-    return static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+    return (static_cast<std::size_t>(y) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(x);
   };
 
   auto clamp = [](int value, int low, int high) { return std::max(low, std::min(value, high)); };
@@ -44,11 +44,13 @@ OutType ApplyGaussianReference(const InType &input) {
   for (int wy = 0; wy < height; ++wy) {
     for (int wx = 0; wx < width; ++wx) {
       int accum = 0;
+      std::size_t kernel_idx = 0;
       for (int ky = -1; ky <= 1; ++ky) {
         const int yy = clamp(wy + ky, 0, height - 1);
         for (int kx = -1; kx <= 1; ++kx) {
           const int xx = clamp(wx + kx, 0, width - 1);
-          accum += kKernel[(ky + 1) * 3 + (kx + 1)] * data[idx(yy, xx)];
+          accum += kKernel.at(kernel_idx) * data[idx(yy, xx)];
+          ++kernel_idx;
         }
       }
       output[idx(wy, wx)] = static_cast<std::uint8_t>((accum + kKernelSum / 2) / kKernelSum);
@@ -99,8 +101,8 @@ InType MakeRamp(int width, int height, int base = 0) {
   std::vector<std::uint8_t> data(static_cast<std::size_t>(width * height));
   for (int yy = 0; yy < height; ++yy) {
     for (int xx = 0; xx < width; ++xx) {
-      const int vv = base + yy * 17 + xx * 3;
-      data[static_cast<std::size_t>(yy) * static_cast<std::size_t>(width) + static_cast<std::size_t>(xx)] =
+      const int vv = base + (yy * 17) + (xx * 3);
+      data[(static_cast<std::size_t>(yy) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(xx)] =
           static_cast<std::uint8_t>(vv & 0xFF);
     }
   }

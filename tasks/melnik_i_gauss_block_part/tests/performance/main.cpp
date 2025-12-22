@@ -2,6 +2,7 @@
 #include <stb/stb_image.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <stdexcept>
 #include <string>

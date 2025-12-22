@@ -66,6 +66,19 @@ class MelnikIGaussBlockPartMPI : public BaseTask {
 
   static void ApplyGaussianFromExtended(const BlockInfo &blk, const std::vector<std::uint8_t> &ext,
                                         std::vector<std::uint8_t> &local_out);
+
+  static void BroadcastImageSize(int rank, int &width, int &height);
+  static std::vector<BlockInfo> BuildAllBlocks(int comm_size, int grid_rows, int grid_cols, int width, int height);
+  static std::vector<std::uint8_t> ScatterBlock(int rank, int comm_size, int width, int height,
+                                                const std::vector<BlockInfo> &blocks, const BlockInfo &my_blk,
+                                                const std::vector<std::uint8_t> &root_data);
+  static std::vector<std::uint8_t> ComputeLocal(const BlockInfo &my_blk, int grid_rows, int grid_cols, int rank,
+                                                const std::vector<BlockInfo> &blocks,
+                                                const std::vector<std::uint8_t> &local_data);
+  static std::vector<std::uint8_t> GatherGlobal(int rank, int comm_size, int width, int height,
+                                                const std::vector<BlockInfo> &blocks, const BlockInfo &my_blk,
+                                                const std::vector<std::uint8_t> &local_out);
+  void FinalizeOutput(int rank, int width, int height, std::vector<std::uint8_t> &global_out);
 };
 
 }  // namespace melnik_i_gauss_block_part
