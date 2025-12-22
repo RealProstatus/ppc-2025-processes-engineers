@@ -1,6 +1,6 @@
 #pragma once
 
-#include <tuple>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -28,6 +28,17 @@ class MelnikIGaussBlockPartMPI : public BaseTask {
     }
   };
 
+  struct Neighbours {
+    int up = 0;
+    int down = 0;
+    int left = 0;
+    int right = 0;
+    int up_left = 0;
+    int up_right = 0;
+    int down_left = 0;
+    int down_right = 0;
+  };
+
   bool ValidationImpl() override;
   bool PreProcessingImpl() override;
   bool RunImpl() override;
@@ -41,8 +52,17 @@ class MelnikIGaussBlockPartMPI : public BaseTask {
   static void FillExtendedWithClamp(const std::vector<std::uint8_t> &local, const BlockInfo &blk, int ext_w,
                                     std::vector<std::uint8_t> &ext);
 
-  static void ExchangeHalos(const BlockInfo &blk, int grid_rows, int grid_cols, int width, int height, int rank,
+  static void ExchangeHalos(const BlockInfo &blk, int grid_rows, int grid_cols, int rank,
                             const std::vector<BlockInfo> &all_blocks, std::vector<std::uint8_t> &ext);
+
+  static Neighbours ComputeNeighbours(const BlockInfo &blk, int grid_rows, int grid_cols, int rank,
+                                      const std::vector<BlockInfo> &all_blocks);
+  static void ExchangeRowHalos(const BlockInfo &blk, const Neighbours &nbh, int ext_w, std::vector<std::uint8_t> &ext);
+  static void ExchangeColHalos(const BlockInfo &blk, const Neighbours &nbh, int ext_w, std::vector<std::uint8_t> &ext);
+  static void ExchangeCornerHalos(const BlockInfo &blk, const Neighbours &nbh, int ext_w,
+                                  std::vector<std::uint8_t> &ext);
+  static void FixCornersWithoutDiagonal(const BlockInfo &blk, const Neighbours &nbh, int ext_w,
+                                        std::vector<std::uint8_t> &ext);
 
   static void ApplyGaussianFromExtended(const BlockInfo &blk, const std::vector<std::uint8_t> &ext,
                                         std::vector<std::uint8_t> &local_out);

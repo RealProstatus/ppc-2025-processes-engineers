@@ -4,26 +4,193 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
-#include <tuple>
-#include <utility>
+#include <ranges>
 #include <vector>
+
+#include "melnik_i_gauss_block_part/common/include/common.hpp"
+#include "task/include/task.hpp"
 
 namespace melnik_i_gauss_block_part {
 
 namespace {
 
 inline std::size_t Idx(int y, int x, int width) {
-  return static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+  return (static_cast<std::size_t>(y) * static_cast<std::size_t>(width)) + static_cast<std::size_t>(x);
 }
 
 inline std::size_t ExtIdx(int y, int x, int ext_w) {
-  return static_cast<std::size_t>(y) * static_cast<std::size_t>(ext_w) + static_cast<std::size_t>(x);
+  return (static_cast<std::size_t>(y) * static_cast<std::size_t>(ext_w)) + static_cast<std::size_t>(x);
 }
 
 }  // namespace
+
+MelnikIGaussBlockPartMPI::Neighbours MelnikIGaussBlockPartMPI::ComputeNeighbours(
+    const BlockInfo &blk, int grid_rows, int grid_cols, int rank, const std::vector<BlockInfo> &all_blocks) {
+  Neighbours nbh;
+  if (blk.Empty()) {
+    return nbh;
+  }
+
+  const int pr = rank / grid_cols;
+  const int pc = rank % grid_cols;
+
+  auto get_rank = [&](int npr, int npc) -> int {
+    if (npr < 0 || npr >= grid_rows || npc < 0 || npc >= grid_cols) {
+      return MPI_PROC_NULL;
+    }
+    const int neighbour = (npr * grid_cols) + npc;
+    const int blocks_size = static_cast<int>(all_blocks.size());
+    if (neighbour < 0 || neighbour >= blocks_size) {
+      return MPI_PROC_NULL;
+    }
+    if (all_blocks[static_cast<std::size_t>(neighbour)].Empty()) {
+      return MPI_PROC_NULL;
+    }
+    return neighbour;
+  };
+
+  nbh.up = get_rank(pr - 1, pc);
+  nbh.down = get_rank(pr + 1, pc);
+  nbh.left = get_rank(pr, pc - 1);
+  nbh.right = get_rank(pr, pc + 1);
+  nbh.up_left = get_rank(pr - 1, pc - 1);
+  nbh.up_right = get_rank(pr - 1, pc + 1);
+  nbh.down_left = get_rank(pr + 1, pc - 1);
+  nbh.down_right = get_rank(pr + 1, pc + 1);
+  return nbh;
+}
+
+void MelnikIGaussBlockPartMPI::ExchangeRowHalos(const BlockInfo &blk, const Neighbours &nbh, int ext_w,
+                                                std::vector<std::uint8_t> &ext) {
+  std::vector<std::uint8_t> recv_row(static_cast<std::size_t>(blk.width), 0);
+
+  MPI_Sendrecv(ext.data() + ExtIdx(1, 1, ext_w), blk.width, MPI_BYTE, nbh.up, 10, recv_row.data(), blk.width, MPI_BYTE,
+               nbh.up, 11, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  if (nbh.up != MPI_PROC_NULL) {
+    std::ranges::copy(recv_row, ext.begin() + static_cast<std::ptrdiff_t>(ExtIdx(0, 1, ext_w)));
+  }
+
+  MPI_Sendrecv(ext.data() + ExtIdx(blk.height, 1, ext_w), blk.width, MPI_BYTE, nbh.down, 11, recv_row.data(), blk.width,
+               MPI_BYTE, nbh.down, 10, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  if (nbh.down != MPI_PROC_NULL) {
+    std::ranges::copy(recv_row, ext.begin() + static_cast<std::ptrdiff_t>(ExtIdx(blk.height + 1, 1, ext_w)));
+  }
+}
+
+void MelnikIGaussBlockPartMPI::ExchangeColHalos(const BlockInfo &blk, const Neighbours &nbh, int ext_w,
+                                                std::vector<std::uint8_t> &ext) {
+  std::vector<std::uint8_t> send_col(static_cast<std::size_t>(blk.height), 0);
+  std::vector<std::uint8_t> recv_col(static_cast<std::size_t>(blk.height), 0);
+
+  for (int row = 0; row < blk.height; ++row) {
+    send_col[static_cast<std::size_t>(row)] = ext[ExtIdx(row + 1, 1, ext_w)];
+  }
+  MPI_Sendrecv(send_col.data(), blk.height, MPI_BYTE, nbh.left, 20, recv_col.data(), blk.height, MPI_BYTE, nbh.left, 21,
+               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  if (nbh.left != MPI_PROC_NULL) {
+    for (int row = 0; row < blk.height; ++row) {
+      ext[ExtIdx(row + 1, 0, ext_w)] = recv_col[static_cast<std::size_t>(row)];
+    }
+  }
+
+  for (int row = 0; row < blk.height; ++row) {
+    send_col[static_cast<std::size_t>(row)] = ext[ExtIdx(row + 1, blk.width, ext_w)];
+  }
+  MPI_Sendrecv(send_col.data(), blk.height, MPI_BYTE, nbh.right, 21, recv_col.data(), blk.height, MPI_BYTE, nbh.right,
+               20, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  if (nbh.right != MPI_PROC_NULL) {
+    for (int row = 0; row < blk.height; ++row) {
+      ext[ExtIdx(row + 1, blk.width + 1, ext_w)] = recv_col[static_cast<std::size_t>(row)];
+    }
+  }
+}
+
+void MelnikIGaussBlockPartMPI::ExchangeCornerHalos(const BlockInfo &blk, const Neighbours &nbh, int ext_w,
+                                                   std::vector<std::uint8_t> &ext) {
+  std::uint8_t send_val = 0;
+  std::uint8_t recv_val = 0;
+
+  // - up_left <-> down_right : tags (30, 31)
+  // - up_right <-> down_left : tags (32, 33)
+  send_val = ext[ExtIdx(1, 1, ext_w)];
+  MPI_Sendrecv(&send_val, 1, MPI_BYTE, nbh.up_left, 30, &recv_val, 1, MPI_BYTE, nbh.up_left, 31, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+  if (nbh.up_left != MPI_PROC_NULL) {
+    ext[ExtIdx(0, 0, ext_w)] = recv_val;
+  }
+
+  send_val = ext[ExtIdx(1, blk.width, ext_w)];
+  MPI_Sendrecv(&send_val, 1, MPI_BYTE, nbh.up_right, 32, &recv_val, 1, MPI_BYTE, nbh.up_right, 33, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+  if (nbh.up_right != MPI_PROC_NULL) {
+    ext[ExtIdx(0, blk.width + 1, ext_w)] = recv_val;
+  }
+
+  send_val = ext[ExtIdx(blk.height, 1, ext_w)];
+  MPI_Sendrecv(&send_val, 1, MPI_BYTE, nbh.down_left, 33, &recv_val, 1, MPI_BYTE, nbh.down_left, 32, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+  if (nbh.down_left != MPI_PROC_NULL) {
+    ext[ExtIdx(blk.height + 1, 0, ext_w)] = recv_val;
+  }
+
+  send_val = ext[ExtIdx(blk.height, blk.width, ext_w)];
+  MPI_Sendrecv(&send_val, 1, MPI_BYTE, nbh.down_right, 31, &recv_val, 1, MPI_BYTE, nbh.down_right, 30, MPI_COMM_WORLD,
+               MPI_STATUS_IGNORE);
+  if (nbh.down_right != MPI_PROC_NULL) {
+    ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = recv_val;
+  }
+}
+
+void MelnikIGaussBlockPartMPI::FixCornersWithoutDiagonal(const BlockInfo &blk, const Neighbours &nbh, int ext_w,
+                                                         std::vector<std::uint8_t> &ext) {
+  const bool has_up = nbh.up != MPI_PROC_NULL;
+  const bool has_down = nbh.down != MPI_PROC_NULL;
+  const bool has_left = nbh.left != MPI_PROC_NULL;
+  const bool has_right = nbh.right != MPI_PROC_NULL;
+
+  if (nbh.up_left == MPI_PROC_NULL) {
+    if (has_left) {
+      ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(1, 0, ext_w)];
+    } else if (has_up) {
+      ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(0, 1, ext_w)];
+    } else {
+      ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(1, 1, ext_w)];
+    }
+  }
+
+  if (nbh.up_right == MPI_PROC_NULL) {
+    if (has_right) {
+      ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(1, blk.width + 1, ext_w)];
+    } else if (has_up) {
+      ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(0, blk.width, ext_w)];
+    } else {
+      ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(1, blk.width, ext_w)];
+    }
+  }
+
+  if (nbh.down_left == MPI_PROC_NULL) {
+    if (has_left) {
+      ext[ExtIdx(blk.height + 1, 0, ext_w)] = ext[ExtIdx(blk.height, 0, ext_w)];
+    } else if (has_down) {
+      ext[ExtIdx(blk.height + 1, 0, ext_w)] = ext[ExtIdx(blk.height + 1, 1, ext_w)];
+    } else {
+      ext[ExtIdx(blk.height + 1, 0, ext_w)] = ext[ExtIdx(blk.height, 1, ext_w)];
+    }
+  }
+
+  if (nbh.down_right == MPI_PROC_NULL) {
+    if (has_right) {
+      ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height, blk.width + 1, ext_w)];
+    } else if (has_down) {
+      ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height + 1, blk.width, ext_w)];
+    } else {
+      ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height, blk.width, ext_w)];
+    }
+  }
+}
 
 MelnikIGaussBlockPartMPI::MelnikIGaussBlockPartMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
@@ -37,30 +204,20 @@ bool MelnikIGaussBlockPartMPI::ValidationImpl() {
 
   int width = 0;
   int height = 0;
-  std::size_t sz = 0;
+  int valid_flag = 0;
   if (rank == 0) {
     const auto &[data, w, h] = GetInput();
     width = w;
     height = h;
-    sz = data.size();
+    const std::size_t expected =
+        (width > 0 && height > 0) ? (static_cast<std::size_t>(width) * static_cast<std::size_t>(height)) : 0U;
+    valid_flag = (width > 0 && height > 0 && data.size() == expected) ? 1 : 0;
   }
 
   MPI_Bcast(&width, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&height, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-  const std::size_t expected =
-      (width > 0 && height > 0) ? static_cast<std::size_t>(width) * static_cast<std::size_t>(height) : 0U;
-
-  unsigned long long sz_ull = 0;
-  if (rank == 0) {
-    sz_ull = static_cast<unsigned long long>(sz);
-  }
-  MPI_Bcast(&sz_ull, 1, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
-
-  if (width <= 0 || height <= 0) {
-    return false;
-  }
-  return static_cast<std::size_t>(sz_ull) == expected;
+  MPI_Bcast(&valid_flag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  return valid_flag == 1;
 }
 
 bool MelnikIGaussBlockPartMPI::PreProcessingImpl() {
@@ -87,17 +244,17 @@ std::pair<int, int> MelnikIGaussBlockPartMPI::ComputeProcessGrid(int comm_size, 
 
   const double aspect = static_cast<double>(height) / static_cast<double>(width);
 
-  for (int r = 1; r <= comm_size; ++r) {
-    if (comm_size % r != 0) {
+  for (int rows = 1; rows <= comm_size; ++rows) {
+    if (comm_size % rows != 0) {
       continue;
     }
-    const int c = comm_size / r;
-    const double grid_aspect = static_cast<double>(r) / static_cast<double>(c);
-    const double cost = std::abs(grid_aspect - aspect) + 0.01 * std::abs(r - c);
+    const int cols = comm_size / rows;
+    const double grid_aspect = static_cast<double>(rows) / static_cast<double>(cols);
+    const double cost = std::abs(grid_aspect - aspect) + (0.01 * std::abs(rows - cols));
     if (cost < best_cost) {
       best_cost = cost;
-      best_r = r;
-      best_c = c;
+      best_r = rows;
+      best_c = cols;
     }
   }
 
@@ -115,10 +272,10 @@ MelnikIGaussBlockPartMPI::BlockInfo MelnikIGaussBlockPartMPI::ComputeBlockInfoBy
   const int local_w = base_w + (pc < rem_w ? 1 : 0);
   const int local_h = base_h + (pr < rem_h ? 1 : 0);
 
-  const int start_x = pc * base_w + std::min(pc, rem_w);
-  const int start_y = pr * base_h + std::min(pr, rem_h);
+  const int start_x = (pc * base_w) + std::min(pc, rem_w);
+  const int start_y = (pr * base_h) + std::min(pr, rem_h);
 
-  return BlockInfo{start_x, start_y, local_w, local_h};
+  return BlockInfo{.start_x = start_x, .start_y = start_y, .width = local_w, .height = local_h};
 }
 
 MelnikIGaussBlockPartMPI::BlockInfo MelnikIGaussBlockPartMPI::ComputeBlockInfo(int rank, int grid_rows, int grid_cols,
@@ -131,23 +288,23 @@ MelnikIGaussBlockPartMPI::BlockInfo MelnikIGaussBlockPartMPI::ComputeBlockInfo(i
 void MelnikIGaussBlockPartMPI::FillExtendedWithClamp(const std::vector<std::uint8_t> &local, const BlockInfo &blk,
                                                      int ext_w, std::vector<std::uint8_t> &ext) {
   const int ext_h = blk.height + 2;
-  ext.assign(static_cast<std::size_t>(ext_w * ext_h), 0);
+  ext.assign(static_cast<std::size_t>(ext_w) * static_cast<std::size_t>(ext_h), 0);
 
   // Interior
-  for (int y = 0; y < blk.height; ++y) {
-    for (int x = 0; x < blk.width; ++x) {
-      ext[ExtIdx(y + 1, x + 1, ext_w)] = local[Idx(y, x, blk.width)];
+  for (int row = 0; row < blk.height; ++row) {
+    for (int col = 0; col < blk.width; ++col) {
+      ext[ExtIdx(row + 1, col + 1, ext_w)] = local[Idx(row, col, blk.width)];
     }
   }
 
   // Clamp borders based on own interior
-  for (int x = 1; x <= blk.width; ++x) {
-    ext[ExtIdx(0, x, ext_w)] = ext[ExtIdx(1, x, ext_w)];
-    ext[ExtIdx(blk.height + 1, x, ext_w)] = ext[ExtIdx(blk.height, x, ext_w)];
+  for (int col = 1; col <= blk.width; ++col) {
+    ext[ExtIdx(0, col, ext_w)] = ext[ExtIdx(1, col, ext_w)];
+    ext[ExtIdx(blk.height + 1, col, ext_w)] = ext[ExtIdx(blk.height, col, ext_w)];
   }
-  for (int y = 1; y <= blk.height; ++y) {
-    ext[ExtIdx(y, 0, ext_w)] = ext[ExtIdx(y, 1, ext_w)];
-    ext[ExtIdx(y, blk.width + 1, ext_w)] = ext[ExtIdx(y, blk.width, ext_w)];
+  for (int row = 1; row <= blk.height; ++row) {
+    ext[ExtIdx(row, 0, ext_w)] = ext[ExtIdx(row, 1, ext_w)];
+    ext[ExtIdx(row, blk.width + 1, ext_w)] = ext[ExtIdx(row, blk.width, ext_w)];
   }
   ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(1, 1, ext_w)];
   ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(1, blk.width, ext_w)];
@@ -155,175 +312,18 @@ void MelnikIGaussBlockPartMPI::FillExtendedWithClamp(const std::vector<std::uint
   ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height, blk.width, ext_w)];
 }
 
-void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows, int grid_cols, int width, int height,
-                                             int rank, const std::vector<BlockInfo> &all_blocks,
-                                             std::vector<std::uint8_t> &ext) {
+void MelnikIGaussBlockPartMPI::ExchangeHalos(const BlockInfo &blk, int grid_rows, int grid_cols, int rank,
+                                             const std::vector<BlockInfo> &all_blocks, std::vector<std::uint8_t> &ext) {
   if (blk.Empty()) {
     return;
   }
-
-  const int pr = rank / grid_cols;
-  const int pc = rank % grid_cols;
-
-  auto neighbor_rank = [&](int npr, int npc) -> int {
-    if (npr < 0 || npr >= grid_rows || npc < 0 || npc >= grid_cols) {
-      return MPI_PROC_NULL;
-    }
-    const int r = npr * grid_cols + npc;
-    if (r < 0 || r >= static_cast<int>(all_blocks.size())) {
-      return MPI_PROC_NULL;
-    }
-    if (all_blocks[static_cast<std::size_t>(r)].Empty()) {
-      return MPI_PROC_NULL;
-    }
-    return r;
-  };
-
-  const int up = neighbor_rank(pr - 1, pc);
-  const int down = neighbor_rank(pr + 1, pc);
-  const int left = neighbor_rank(pr, pc - 1);
-  const int right = neighbor_rank(pr, pc + 1);
-  const int up_left = neighbor_rank(pr - 1, pc - 1);
-  const int up_right = neighbor_rank(pr - 1, pc + 1);
-  const int down_left = neighbor_rank(pr + 1, pc - 1);
-  const int down_right = neighbor_rank(pr + 1, pc + 1);
-
+  const Neighbours nbh = ComputeNeighbours(blk, grid_rows, grid_cols, rank, all_blocks);
   const int ext_w = blk.width + 2;
 
-  // Rows (overwrite clamp if neighbor exists)
-  std::vector<std::uint8_t> recv_row(static_cast<std::size_t>(blk.width), 0);
-
-  // receive top halo from up, send my top row to up? (symmetric with down)
-  MPI_Sendrecv(ext.data() + ExtIdx(1, 1, ext_w), blk.width, MPI_UNSIGNED_CHAR, up, 10, recv_row.data(), blk.width,
-               MPI_UNSIGNED_CHAR, up, 11, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (up != MPI_PROC_NULL) {
-    std::copy(recv_row.begin(), recv_row.end(), ext.begin() + static_cast<std::ptrdiff_t>(ExtIdx(0, 1, ext_w)));
-  }
-
-  MPI_Sendrecv(ext.data() + ExtIdx(blk.height, 1, ext_w), blk.width, MPI_UNSIGNED_CHAR, down, 11, recv_row.data(),
-               blk.width, MPI_UNSIGNED_CHAR, down, 10, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (down != MPI_PROC_NULL) {
-    std::copy(recv_row.begin(), recv_row.end(),
-              ext.begin() + static_cast<std::ptrdiff_t>(ExtIdx(blk.height + 1, 1, ext_w)));
-  }
-
-  // Columns
-  std::vector<std::uint8_t> send_col(static_cast<std::size_t>(blk.height), 0);
-  std::vector<std::uint8_t> recv_col(static_cast<std::size_t>(blk.height), 0);
-
-  // left column exchange
-  for (int y = 0; y < blk.height; ++y) {
-    send_col[static_cast<std::size_t>(y)] = ext[ExtIdx(y + 1, 1, ext_w)];
-  }
-  MPI_Sendrecv(send_col.data(), blk.height, MPI_UNSIGNED_CHAR, left, 20, recv_col.data(), blk.height, MPI_UNSIGNED_CHAR,
-               left, 21, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (left != MPI_PROC_NULL) {
-    for (int y = 0; y < blk.height; ++y) {
-      ext[ExtIdx(y + 1, 0, ext_w)] = recv_col[static_cast<std::size_t>(y)];
-    }
-  }
-
-  // right column exchange
-  for (int y = 0; y < blk.height; ++y) {
-    send_col[static_cast<std::size_t>(y)] = ext[ExtIdx(y + 1, blk.width, ext_w)];
-  }
-  MPI_Sendrecv(send_col.data(), blk.height, MPI_UNSIGNED_CHAR, right, 21, recv_col.data(), blk.height,
-               MPI_UNSIGNED_CHAR, right, 20, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (right != MPI_PROC_NULL) {
-    for (int y = 0; y < blk.height; ++y) {
-      ext[ExtIdx(y + 1, blk.width + 1, ext_w)] = recv_col[static_cast<std::size_t>(y)];
-    }
-  }
-
-  // Corners (1 byte each) - overwrite clamp if diagonal neighbor exists
-  std::uint8_t send_val = 0;
-  std::uint8_t recv_val = 0;
-
-  // Diagonal corner exchange must use matched tag pairs:
-  // - up_left <-> down_right : tags (30, 31)
-  // - up_right <-> down_left : tags (32, 33)
-
-  // up-left: send my top-left, receive their bottom-right
-  send_val = ext[ExtIdx(1, 1, ext_w)];
-  MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, up_left, 30, &recv_val, 1, MPI_UNSIGNED_CHAR, up_left, 31,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (up_left != MPI_PROC_NULL) {
-    ext[ExtIdx(0, 0, ext_w)] = recv_val;
-  }
-
-  // up-right: send my top-right, receive their bottom-left
-  send_val = ext[ExtIdx(1, blk.width, ext_w)];
-  MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, up_right, 32, &recv_val, 1, MPI_UNSIGNED_CHAR, up_right, 33,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (up_right != MPI_PROC_NULL) {
-    ext[ExtIdx(0, blk.width + 1, ext_w)] = recv_val;
-  }
-
-  // down-left: send my bottom-left, receive their top-right (swap tags vs up-right)
-  send_val = ext[ExtIdx(blk.height, 1, ext_w)];
-  MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, down_left, 33, &recv_val, 1, MPI_UNSIGNED_CHAR, down_left, 32,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (down_left != MPI_PROC_NULL) {
-    ext[ExtIdx(blk.height + 1, 0, ext_w)] = recv_val;
-  }
-
-  // down-right: send my bottom-right, receive their top-left (swap tags vs up-left)
-  send_val = ext[ExtIdx(blk.height, blk.width, ext_w)];
-  MPI_Sendrecv(&send_val, 1, MPI_UNSIGNED_CHAR, down_right, 31, &recv_val, 1, MPI_UNSIGNED_CHAR, down_right, 30,
-               MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  if (down_right != MPI_PROC_NULL) {
-    ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = recv_val;
-  }
-
-  // If diagonal neighbour is absent, corners still must be consistent with updated edge halos.
-  // This is essential for correct convolution near block boundaries when only left/right (or up/down) halo exists.
-  const bool has_up = up != MPI_PROC_NULL;
-  const bool has_down = down != MPI_PROC_NULL;
-  const bool has_left = left != MPI_PROC_NULL;
-  const bool has_right = right != MPI_PROC_NULL;
-
-  if (up_left == MPI_PROC_NULL) {
-    if (has_left) {
-      ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(1, 0, ext_w)];
-    } else if (has_up) {
-      ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(0, 1, ext_w)];
-    } else {
-      ext[ExtIdx(0, 0, ext_w)] = ext[ExtIdx(1, 1, ext_w)];
-    }
-  }
-
-  if (up_right == MPI_PROC_NULL) {
-    if (has_right) {
-      ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(1, blk.width + 1, ext_w)];
-    } else if (has_up) {
-      ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(0, blk.width, ext_w)];
-    } else {
-      ext[ExtIdx(0, blk.width + 1, ext_w)] = ext[ExtIdx(1, blk.width, ext_w)];
-    }
-  }
-
-  if (down_left == MPI_PROC_NULL) {
-    if (has_left) {
-      ext[ExtIdx(blk.height + 1, 0, ext_w)] = ext[ExtIdx(blk.height, 0, ext_w)];
-    } else if (has_down) {
-      ext[ExtIdx(blk.height + 1, 0, ext_w)] = ext[ExtIdx(blk.height + 1, 1, ext_w)];
-    } else {
-      ext[ExtIdx(blk.height + 1, 0, ext_w)] = ext[ExtIdx(blk.height, 1, ext_w)];
-    }
-  }
-
-  if (down_right == MPI_PROC_NULL) {
-    if (has_right) {
-      ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height, blk.width + 1, ext_w)];
-    } else if (has_down) {
-      ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height + 1, blk.width, ext_w)];
-    } else {
-      ext[ExtIdx(blk.height + 1, blk.width + 1, ext_w)] = ext[ExtIdx(blk.height, blk.width, ext_w)];
-    }
-  }
-
-  (void)width;
-  (void)height;
+  ExchangeRowHalos(blk, nbh, ext_w, ext);
+  ExchangeColHalos(blk, nbh, ext_w, ext);
+  ExchangeCornerHalos(blk, nbh, ext_w, ext);
+  FixCornersWithoutDiagonal(blk, nbh, ext_w, ext);
 }
 
 void MelnikIGaussBlockPartMPI::ApplyGaussianFromExtended(const BlockInfo &blk, const std::vector<std::uint8_t> &ext,
@@ -339,17 +339,17 @@ void MelnikIGaussBlockPartMPI::ApplyGaussianFromExtended(const BlockInfo &blk, c
   const int ext_w = blk.width + 2;
   local_out.resize(static_cast<std::size_t>(blk.width) * static_cast<std::size_t>(blk.height));
 
-  for (int y = 0; y < blk.height; ++y) {
-    for (int x = 0; x < blk.width; ++x) {
+  for (int row = 0; row < blk.height; ++row) {
+    for (int col = 0; col < blk.width; ++col) {
       int acc = 0;
-      int k = 0;
+      std::size_t kernel_idx = 0;
       for (int dy = 0; dy < 3; ++dy) {
         for (int dx = 0; dx < 3; ++dx) {
-          acc += kKernel[static_cast<std::size_t>(k)] * static_cast<int>(ext[ExtIdx(y + dy, x + dx, ext_w)]);
-          ++k;
+          acc += kKernel.at(kernel_idx) * static_cast<int>(ext[ExtIdx(row + dy, col + dx, ext_w)]);
+          ++kernel_idx;
         }
       }
-      local_out[Idx(y, x, blk.width)] = static_cast<std::uint8_t>((acc + kSum / 2) / kSum);
+      local_out[Idx(row, col, blk.width)] = static_cast<std::uint8_t>((acc + kSum / 2) / kSum);
     }
   }
 }
@@ -374,8 +374,8 @@ bool MelnikIGaussBlockPartMPI::RunImpl() {
   const auto [grid_rows, grid_cols] = ComputeProcessGrid(comm_size, width, height);
 
   std::vector<BlockInfo> blocks(static_cast<std::size_t>(comm_size));
-  for (int r = 0; r < comm_size; ++r) {
-    blocks[static_cast<std::size_t>(r)] = ComputeBlockInfo(r, grid_rows, grid_cols, width, height);
+  for (int rank_idx = 0; rank_idx < comm_size; ++rank_idx) {
+    blocks[static_cast<std::size_t>(rank_idx)] = ComputeBlockInfo(rank_idx, grid_rows, grid_cols, width, height);
   }
 
   const BlockInfo my_blk = blocks[static_cast<std::size_t>(rank)];
@@ -393,45 +393,37 @@ bool MelnikIGaussBlockPartMPI::RunImpl() {
 
     // Copy root local block
     if (!my_blk.Empty()) {
-      for (int y = 0; y < my_blk.height; ++y) {
-        const int gy = my_blk.start_y + y;
-        const std::size_t src_off = Idx(gy, my_blk.start_x, width);
-        const std::size_t dst_off = Idx(y, 0, my_blk.width);
-        std::copy(data.begin() + static_cast<std::ptrdiff_t>(src_off),
-                  data.begin() + static_cast<std::ptrdiff_t>(src_off + static_cast<std::size_t>(my_blk.width)),
-                  local_data.begin() + static_cast<std::ptrdiff_t>(dst_off));
+      for (int row = 0; row < my_blk.height; ++row) {
+        const int global_row = my_blk.start_y + row;
+        const std::size_t src_off = Idx(global_row, my_blk.start_x, width);
+        const std::size_t dst_off = Idx(row, 0, my_blk.width);
+        std::ranges::copy(data.begin() + static_cast<std::ptrdiff_t>(src_off),
+                          data.begin() + static_cast<std::ptrdiff_t>(src_off + static_cast<std::size_t>(my_blk.width)),
+                          local_data.begin() + static_cast<std::ptrdiff_t>(dst_off));
       }
     }
 
-    std::vector<MPI_Request> reqs;
-    reqs.reserve(static_cast<std::size_t>(comm_size > 0 ? comm_size - 1 : 0));
     for (int dest = 1; dest < comm_size; ++dest) {
       const auto &blk = blocks[static_cast<std::size_t>(dest)];
-      MPI_Request req{};
       if (blk.Empty()) {
-        MPI_Isend(nullptr, 0, MPI_UNSIGNED_CHAR, dest, 0, MPI_COMM_WORLD, &req);
-        reqs.push_back(req);
+        MPI_Send(nullptr, 0, MPI_BYTE, dest, 0, MPI_COMM_WORLD);
         continue;
       }
 
       MPI_Datatype sub{};
-      const int sizes[2] = {height, width};
-      const int subs[2] = {blk.height, blk.width};
-      const int starts[2] = {blk.start_y, blk.start_x};
-      MPI_Type_create_subarray(2, sizes, subs, starts, MPI_ORDER_C, MPI_UNSIGNED_CHAR, &sub);
+      const std::array<int, 2> sizes = {height, width};
+      const std::array<int, 2> subs = {blk.height, blk.width};
+      const std::array<int, 2> starts = {blk.start_y, blk.start_x};
+      MPI_Type_create_subarray(2, sizes.data(), subs.data(), starts.data(), MPI_ORDER_C, MPI_BYTE, &sub);
       MPI_Type_commit(&sub);
 
-      MPI_Isend(const_cast<std::uint8_t *>(data.data()), 1, sub, dest, 0, MPI_COMM_WORLD, &req);
+      MPI_Send(data.data(), 1, sub, dest, 0, MPI_COMM_WORLD);
       MPI_Type_free(&sub);
-      reqs.push_back(req);
-    }
-    if (!reqs.empty()) {
-      MPI_Waitall(static_cast<int>(reqs.size()), reqs.data(), MPI_STATUSES_IGNORE);
     }
   } else {
     const int recv_count = my_blk.Empty() ? 0 : (my_blk.width * my_blk.height);
     std::uint8_t *recv_ptr = recv_count > 0 ? local_data.data() : nullptr;
-    MPI_Recv(recv_ptr, recv_count, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(recv_ptr, recv_count, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 
   // Halo + compute local output
@@ -440,7 +432,7 @@ bool MelnikIGaussBlockPartMPI::RunImpl() {
     std::vector<std::uint8_t> ext;
     const int ext_w = my_blk.width + 2;
     FillExtendedWithClamp(local_data, my_blk, ext_w, ext);
-    ExchangeHalos(my_blk, grid_rows, grid_cols, width, height, rank, blocks, ext);
+    ExchangeHalos(my_blk, grid_rows, grid_cols, rank, blocks, ext);
     ApplyGaussianFromExtended(my_blk, ext, local_out);
   }
 
@@ -450,44 +442,37 @@ bool MelnikIGaussBlockPartMPI::RunImpl() {
     global_out.assign(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0);
     // Copy root block
     if (!my_blk.Empty()) {
-      for (int y = 0; y < my_blk.height; ++y) {
-        const std::size_t dst_off = Idx(my_blk.start_y + y, my_blk.start_x, width);
-        const std::size_t src_off = Idx(y, 0, my_blk.width);
-        std::copy(local_out.begin() + static_cast<std::ptrdiff_t>(src_off),
-                  local_out.begin() + static_cast<std::ptrdiff_t>(src_off + static_cast<std::size_t>(my_blk.width)),
-                  global_out.begin() + static_cast<std::ptrdiff_t>(dst_off));
+      for (int row = 0; row < my_blk.height; ++row) {
+        const std::size_t dst_off = Idx(my_blk.start_y + row, my_blk.start_x, width);
+        const std::size_t src_off = Idx(row, 0, my_blk.width);
+        std::ranges::copy(
+            local_out.begin() + static_cast<std::ptrdiff_t>(src_off),
+            local_out.begin() + static_cast<std::ptrdiff_t>(src_off + static_cast<std::size_t>(my_blk.width)),
+            global_out.begin() + static_cast<std::ptrdiff_t>(dst_off));
       }
     }
 
-    std::vector<MPI_Request> reqs;
-    reqs.reserve(static_cast<std::size_t>(comm_size > 0 ? comm_size - 1 : 0));
     for (int src = 1; src < comm_size; ++src) {
       const auto &blk = blocks[static_cast<std::size_t>(src)];
-      MPI_Request req{};
       if (blk.Empty()) {
-        MPI_Irecv(nullptr, 0, MPI_UNSIGNED_CHAR, src, 1, MPI_COMM_WORLD, &req);
-        reqs.push_back(req);
+        MPI_Recv(nullptr, 0, MPI_BYTE, src, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         continue;
       }
 
       MPI_Datatype sub{};
-      const int sizes[2] = {height, width};
-      const int subs[2] = {blk.height, blk.width};
-      const int starts[2] = {blk.start_y, blk.start_x};
-      MPI_Type_create_subarray(2, sizes, subs, starts, MPI_ORDER_C, MPI_UNSIGNED_CHAR, &sub);
+      const std::array<int, 2> sizes = {height, width};
+      const std::array<int, 2> subs = {blk.height, blk.width};
+      const std::array<int, 2> starts = {blk.start_y, blk.start_x};
+      MPI_Type_create_subarray(2, sizes.data(), subs.data(), starts.data(), MPI_ORDER_C, MPI_BYTE, &sub);
       MPI_Type_commit(&sub);
 
-      MPI_Irecv(global_out.data(), 1, sub, src, 1, MPI_COMM_WORLD, &req);
+      MPI_Recv(global_out.data(), 1, sub, src, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       MPI_Type_free(&sub);
-      reqs.push_back(req);
-    }
-    if (!reqs.empty()) {
-      MPI_Waitall(static_cast<int>(reqs.size()), reqs.data(), MPI_STATUSES_IGNORE);
     }
   } else {
     const int send_count = my_blk.Empty() ? 0 : (my_blk.width * my_blk.height);
     const std::uint8_t *send_ptr = send_count > 0 ? local_out.data() : nullptr;
-    MPI_Send(const_cast<std::uint8_t *>(send_ptr), send_count, MPI_UNSIGNED_CHAR, 0, 1, MPI_COMM_WORLD);
+    MPI_Send(send_ptr, send_count, MPI_BYTE, 0, 1, MPI_COMM_WORLD);
   }
 
   // In functional tests every rank validates output, so we broadcast.
@@ -499,7 +484,7 @@ bool MelnikIGaussBlockPartMPI::RunImpl() {
       global_out.assign(total, 0);
     }
     if (total > 0) {
-      MPI_Bcast(global_out.data(), static_cast<int>(total), MPI_UNSIGNED_CHAR, 0, MPI_COMM_WORLD);
+      MPI_Bcast(global_out.data(), static_cast<int>(total), MPI_BYTE, 0, MPI_COMM_WORLD);
     }
     GetOutput() = std::move(global_out);
   } else {
